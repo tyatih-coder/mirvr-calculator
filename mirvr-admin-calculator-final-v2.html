@@ -356,173 +356,91 @@ function calc() {
 
   if (msgType === 'birthday') {
     const totalMinutes = end - start;
-    if (totalMinutes < 240) {
-      partsViewEl.textContent = 'Для сценария Дня рождения нужно минимум 4 часа между началом и концом праздника.';
-      totalPayEl.textContent      = 'Ошибка';
-      baseTotalEl.textContent     = '—';
-      discountValueEl.textContent = '—';
-      perPlaceEl.textContent      = '—';
-      return {
-        baseTotal: 0,
-        finalTotal: 0,
-        perPlace: 0,
-        discount: { amount: 0, title: '', note: '' },
-        detail: ''
-      };
-    }
 
+    // Всегда считаем 30 мин банкет в начале и 30 мин торт в конце окна
     const banquet1Start = start;
-    const banquet1End   = start + 30;
-    const game1Start    = banquet1End;
-    const game1End      = game1Start + 90;
-    const banquet2Start = game1End;
-    const banquet2End   = banquet2Start + 30;
-    const game2Start    = banquet2End;
-    const game2End      = game2Start + 90;
+    const banquet1End   = Math.min(start + 30, end);
+    const banquet2End   = end;
+    const banquet2Start = Math.max(end - 30, banquet1End);
+
+    let game1Start = banquet1End;
+    let game2End   = banquet2Start;
+
+    let totalGameMinutes = Math.max(0, game2End - game1Start);
+
+    // Если игр меньше 60 минут, считаем всё одним блоком игр
+    if (totalGameMinutes <= 0) {
+      totalGameMinutes = 0;
+    }
 
     timeline.push(
       { start: banquet1Start, end: banquet1End, text: `${fmtTime(banquet1Start)}–${fmtTime(banquet1End)} банкет — 30 минут` },
       { start: banquet2Start, end: banquet2End, text: `${fmtTime(banquet2Start)}–${fmtTime(banquet2End)} торжественная часть / торт — 30 минут` }
     );
 
-    if (!dayType.isWeekday) {
-      // Выходной: один тариф 350, считаем блоками 1,5 часа
-      const firstBlockHours = 1.5;
-      const firstBlockCostPerPlace = firstBlockHours * RATE_WEEKEND;
-      const firstBlockCostTotal    = firstBlockCostPerPlace * places;
+    if (totalGameMinutes > 0) {
+      const gameStart = game1Start;
+      const gameEnd   = game2End;
 
-      timeline.push({
-        start: game1Start,
-        end: game1End,
-        text: `${fmtTime(game1Start)}–${fmtTime(game1End)} (выходной/праздник): ${firstBlockHours
-          .toFixed(2)
-          .replace('.', ',')} ч × ${RATE_WEEKEND} × ${places} игроков = ${money(firstBlockCostTotal)} всего`
-      });
+      const gameSegmentsBase = splitByTariff(gameStart, gameEnd, dayType.isWeekday);
 
-      // Второй блок: 1,5 часа (0,5 без скидки, 1 час со скидкой)
-      const secondBlockFirstPartHours  = 0.5;
-      const secondBlockSecondPartHours = 1.0;
+      const gameHours = totalGameMinutes / 60;
 
-      const secondPartStart = game2Start + secondBlockFirstPartHours * 60;
-      const secondPartEnd   = game2End;
+      let gameSegments;
 
-      const costFirstPartPerPlace  = secondBlockFirstPartHours * RATE_WEEKEND;
-      const costFirstPartTotal     = costFirstPartPerPlace * places;
+      if (gameHours < DISCOUNT_START_HOUR) {
+        // меньше 3 часов игр – без 50% скидки
+        gameSegments = gameSegmentsBase.map(seg => ({
+          ...seg,
+          discounted: false
+        }));
+      } else {
+        // 3 часа и больше – применяем почасовую скидку с 3-го часа
+        gameSegments = applyHourDiscount(gameSegmentsBase);
+      }
 
-      const costSecondFullPerPlace = secondBlockSecondPartHours * RATE_WEEKEND;
-      const discountSecondPerPlace = costSecondFullPerPlace * DISCOUNT_PERCENT;
-      const costSecondPartPerPlace = costSecondFullPerPlace - discountSecondPerPlace;
-      const costSecondPartTotal    = costSecondPartPerPlace * places;
+      gameSegments.forEach(seg => {
+        const fullCostPerPlace = seg.hours * seg.rate;
+        const costPartPerPlace = seg.discounted ? fullCostPerPlace * (1 - DISCOUNT_PERCENT) : fullCostPerPlace;
+        const fullCostTotal    = fullCostPerPlace * places;
+        const costPartTotal    = costPartPerPlace * places;
 
-      timeline.push({
-        start: game2Start,
-        end: secondPartStart,
-        text: `${fmtTime(game2Start)}–${fmtTime(secondPartStart)} (выходной/праздник): ${secondBlockFirstPartHours
-          .toFixed(2)
-          .replace('.', ',')} ч × ${RATE_WEEKEND} × ${places} игроков = ${money(costFirstPartTotal)} всего`
-      });
+        perPlaceBase         += fullCostPerPlace;
+        perPlaceDiscountPart += fullCostPerPlace - costPartPerPlace;
 
-      timeline.push({
-        start: secondPartStart,
-        end: secondPartEnd,
-        text: `${fmtTime(secondPartStart)}–${fmtTime(secondPartEnd)} (выходной/праздник) со скидкой 50%: ${secondBlockSecondPartHours
-          .toFixed(2)
-          .replace('.', ',')} ч × ${RATE_WEEKEND} × 50% × ${places} игроков = ${money(costSecondPartTotal)} всего`
-      });
+        if (seg.period === 'before') {
+          before18PerPlace += fullCostPerPlace;
+        }
 
-      discountLines.push(
-        `Скидка за ${secondBlockSecondPartHours
-          .toFixed(2)
-          .replace('.', ',')} ч (начиная с ${DISCOUNT_START_HOUR}-го часа игр) по ${RATE_WEEKEND} × ${places} игроков: −${money(discountSecondPerPlace * places)}`
-      );
+        const periodTitle =
+          seg.period === 'before' ? 'будний до 18:00' :
+          seg.period === 'after'  ? 'будний после 18:00' :
+          'выходной/праздник';
 
-      perPlaceBase         = firstBlockCostPerPlace + costFirstPartPerPlace + costSecondFullPerPlace;
-      perPlaceDiscountPart = discountSecondPerPlace;
-    } else {
-      // Будний ДР: режем по тарифам и часам, упрощая вывод, если тариф не меняется
-      const blocks = [
-        { start: game1Start, end: game1End, label: '1,5 часа игр' },
-        { start: game2Start, end: game2End, label: '1,5 часа игр (второй блок)' }
-      ];
-
-      let totalHoursSoFar = 0;
-
-      for (const block of blocks) {
-        const segmentsBase = splitByTariff(block.start, block.end, dayType.isWeekday);
-
-        const uniqueRates = Array.from(new Set(segmentsBase.map(s => s.rate)));
-        const sameRate = uniqueRates.length === 1;
-
-        if (sameRate && totalHoursSoFar < 2) {
-          // Весь блок по одному тарифу, и мы ещё не зашли в 3-й час
-          const blockHours = (block.end - block.start) / 60;
-          const fullCostPerPlace = blockHours * uniqueRates[0];
-          const fullCostTotal    = fullCostPerPlace * places;
-
-          perPlaceBase += fullCostPerPlace;
-          if (segmentsBase[0].period === 'before') {
-            before18PerPlace += fullCostPerPlace;
-          }
-
+        if (!seg.discounted) {
           timeline.push({
-            start: block.start,
-            end: block.end,
-            text: `${fmtTime(block.start)}–${fmtTime(block.end)} (будний, один тариф): ${blockHours
+            start: seg.start,
+            end: seg.end,
+            text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}): ${seg.hours
               .toFixed(2)
-              .replace('.', ',')} ч × ${uniqueRates[0]} × ${places} игроков = ${money(fullCostTotal)} всего`
+              .replace('.', ',')} ч × ${seg.rate} × ${places} игроков = ${money(costPartTotal)} всего`
           });
-
-          totalHoursSoFar += blockHours;
         } else {
-          // В блоке есть смена тарифа, либо мы уже зашли в 3-й час — используем почасовую скидку
-          const segments = applyHourDiscount(segmentsBase);
-
-          segments.forEach(seg => {
-            const fullCostPerPlace = seg.hours * seg.rate;
-            const costPartPerPlace = seg.discounted ? fullCostPerPlace * (1 - DISCOUNT_PERCENT) : fullCostPerPlace;
-            const fullCostTotal    = fullCostPerPlace * places;
-            const costPartTotal    = costPartPerPlace * places;
-
-            perPlaceBase         += fullCostPerPlace;
-            perPlaceDiscountPart += fullCostPerPlace - costPartPerPlace;
-
-            if (seg.period === 'before') {
-              before18PerPlace += fullCostPerPlace;
-            }
-
-            const periodTitle =
-              seg.period === 'before' ? 'будний до 18:00' :
-              seg.period === 'after'  ? 'будний после 18:00' :
-              'выходной/праздник';
-
-            if (!seg.discounted) {
-              timeline.push({
-                start: seg.start,
-                end: seg.end,
-                text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}): ${seg.hours
-                  .toFixed(2)
-                  .replace('.', ',')} ч × ${seg.rate} × ${places} игроков = ${money(costPartTotal)} всего`
-              });
-            } else {
-              const discountTotal = fullCostTotal * DISCOUNT_PERCENT;
-              discountLines.push(
-                `Скидка за ${seg.hours
-                  .toFixed(2)
-                  .replace('.', ',')} ч (начиная с ${DISCOUNT_START_HOUR}-го часа игр) по ${seg.rate} × ${places} игроков: −${money(discountTotal)}`
-              );
-              timeline.push({
-                start: seg.start,
-                end: seg.end,
-                text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}) со скидкой 50%: ${seg.hours
-                  .toFixed(2)
-                  .replace('.', ',')} ч × ${seg.rate} × 50% × ${places} игроков = ${money(costPartTotal)} всего`
-              });
-            }
-
-            totalHoursSoFar += seg.hours;
+          const discountTotal = fullCostTotal * DISCOUNT_PERCENT;
+          discountLines.push(
+            `Скидка за ${seg.hours
+              .toFixed(2)
+              .replace('.', ',')} ч (начиная с ${DISCOUNT_START_HOUR}-го часа игр) по ${seg.rate} × ${places} игроков: −${money(discountTotal)}`
+          );
+          timeline.push({
+            start: seg.start,
+            end: seg.end,
+            text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}) со скидкой 50%: ${seg.hours
+              .toFixed(2)
+              .replace('.', ',')} ч × ${seg.rate} × 50% × ${places} игроков = ${money(costPartTotal)} всего`
           });
         }
-      }
+      });
     }
   } else {
     // Обычные брони
@@ -776,10 +694,10 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
 
 1️⃣ Встреча гостей и банкет
 На сбор гостей и банкет обычно уходит около 30 минут, после чего дети переходят к играм.
-Ещё около 30 минут банкета может проходить после или внутри игрового времени — эти 60 минут не оплачиваются, но входят в общее время праздника.
+Ещё около 30 минут банкета или торта может проходить после или внутри игрового времени — эти 60 минут не оплачиваются, но входят в общее время праздника.
 
 2️⃣ Игровое время
-Стандартное игровое время — 3 часа (1,5 часа игр + 30 минут торта + 1,5 часа игр). Можно забронировать и другие варианты, при этом скидка 50% действует на каждый час, начиная с третьего часа игр.
+В вашем варианте праздника: 30 минут банкет, время игр в окне ${TIME_FROM}–${TIME_TO} и около 30 минут торта/торжественной части. При игровом времени менее 3 часов действует только скидка имениннику, без 50% скидки с третьего часа.
 
 3️⃣ Торжественная часть
 После игр — около 30 минут на торт, поздравления именинника, пиньяту и настольные игры.
@@ -837,10 +755,10 @@ ${ctx.detail}
 
 1️⃣ Зустріч гостей та банкет
 На збори та банкет зазвичай йде близько 30 хвилин, після чого діти переходять до ігор.
-Ще близько 30 хвилин банкету може проходити після або всередині ігрового часу — ці 60 хвилин не оплачуються, але входять у загальний час свята.
+Ще близько 30 хвилин банкету або торта може проходити після або всередині ігрового часу — ці 60 хвилин не оплачуються, але входять у загальний час свята.
 
 2️⃣ Ігровий час
-Стандартний ігровий час — 3 години (1,5 години ігор + 30 хвилин торта + 1,5 години ігор). Можна забронювати й інші варіанти, при цьому знижка 50% діє на кожну годину, починаючи з третьої години ігор.
+У вашому варіанті свята: 30 хвилин банкет, ігровий час у вікні ${TIME_FROM}–${TIME_TO} та близько 30 хвилин торта/урочистої частини. При ігровому часі менше 3 годин діє тільки знижка імениннику, без 50% знижки з третьої години.
 
 3️⃣ Урочиста частина
 Після ігор — приблизно 30 хвилин на торт, привітання іменинника, піньяту та настільні ігри.
