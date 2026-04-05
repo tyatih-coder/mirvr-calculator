@@ -133,11 +133,12 @@
   </div>
 
   <script>
-  const RATE_BEFORE = 300;
-  const RATE_AFTER = 350;
-  const DISCOUNT_AFTER_HOURS = 2;
-  const THIRD_HOUR_DISCOUNT = 0.5;
-  const SWITCH_MINUTES = 18 * 60;
+const RATE_WEEKDAY_BEFORE_18 = 300;
+const RATE_WEEKDAY_AFTER_18  = 350;
+const RATE_WEEKEND           = 350;
+const DISCOUNT_AFTER_HOURS   = 2;
+const THIRD_HOUR_DISCOUNT    = 0.5;
+const SWITCH_MINUTES         = 18 * 60;
 
   const gameDateEl = document.getElementById('gameDate');
   const dayTypeBadgeEl = document.getElementById('dayTypeBadge');
@@ -191,30 +192,52 @@
     };
   }
 
-  function buildSegments(start, end) {
-    const out = [];
-    let current = start;
-    let played = 0;
-    while (current < end) {
-      const boundary = current < SWITCH_MINUTES ? Math.min(end, SWITCH_MINUTES) : end;
-      const durationHours = (boundary - current) / 60;
-      const discountEligible = Math.max(0, (played + durationHours) - DISCOUNT_AFTER_HOURS);
-      const discountedHours = Math.min(durationHours, discountEligible);
-      const normalHours = durationHours - discountedHours;
-      out.push({
-        start: current,
-        end: boundary,
-        period: current < SWITCH_MINUTES ? 'before' : 'after',
-        rate: current < SWITCH_MINUTES ? RATE_BEFORE : RATE_AFTER,
-        durationHours,
-        normalHours,
-        discountedHours
-      });
-      played += durationHours;
-      current = boundary;
+  function buildSegments(start, end, isWeekday) {
+  const out = [];
+  let current = start;
+  let played = 0;
+
+  while (current < end) {
+    const boundary = current < SWITCH_MINUTES ? Math.min(end, SWITCH_MINUTES) : end;
+    const durationHours = (boundary - current) / 60;
+    const discountEligible = Math.max(0, (played + durationHours) - DISCOUNT_AFTER_HOURS);
+    const discountedHours = Math.min(durationHours, discountEligible);
+    const normalHours = durationHours - discountedHours;
+
+    let rate;
+    let period;
+
+    if (!isWeekday) {
+      // вых/праздник — весь день 350
+      rate = RATE_WEEKEND;
+      period = 'weekend';
+    } else {
+      // будни: до 18:00 — 300, после — 350
+      if (current < SWITCH_MINUTES) {
+        rate = RATE_WEEKDAY_BEFORE_18;
+        period = 'before';
+      } else {
+        rate = RATE_WEEKDAY_AFTER_18;
+        period = 'after';
+      }
     }
-    return out;
+
+    out.push({
+      start: current,
+      end: boundary,
+      period,
+      rate,
+      durationHours,
+      normalHours,
+      discountedHours
+    });
+
+    played += durationHours;
+    current = boundary;
   }
+
+  return out;
+}
 
   function calculateDiscount(perPlace, baseTotal, places, discountType, isWeekday, before18Normal, before18Disc) {
     if (discountType === 'birthday') {
@@ -281,7 +304,7 @@ function calc() {
     };
   }
 
-  const segments = buildSegments(start, end);
+  const segments = buildSegments(start, end, dayType.isWeekday);
   let perPlace = 0;
   let before18Normal = 0;
   let before18Disc = 0;
