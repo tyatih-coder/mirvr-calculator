@@ -8,15 +8,34 @@
   <style>
     :root { --bg:#f7f6f2; --panel:#fcfbf8; --panel-2:#f1efea; --border:#d8d4cb; --text:#28251d; --muted:#6e6a63; --primary:#01696f; --primary-2:#e0efee; --accent:#964219; --ok:#2f6b20; --danger:#a13544; --shadow:0 10px 30px rgba(20,20,20,.08); --r:18px; --r2:14px; }
     [data-theme="dark"] { --bg:#171614; --panel:#1d1c1a; --panel-2:#252320; --border:#3a3733; --text:#e6e1d8; --muted:#aaa49a; --primary:#4f98a3; --primary-2:#23363a; --accent:#d8a176; --ok:#86c56a; --danger:#df7d8b; --shadow:0 16px 36px rgba(0,0,0,.35); }
-    *{box-sizing:border-box} body{margin:0;font-family:'Satoshi',Arial,sans-serif;background:linear-gradient(180deg,var(--bg),var(--panel-2));color:var(--text)} .wrap{max-width:1240px;margin:0 auto;padding:24px}
-    .top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px}.brand{display:flex;align-items:center;gap:14px}.logo{width:46px;height:46px;border-radius:14px;background:var(--primary);display:grid;place-items:center;color:#fff;box-shadow:var(--shadow)}
-    .top h1{font-size:clamp(1.5rem,1.1rem + 1.8vw,2.5rem);margin:0}.top p{margin:4px 0 0;color:var(--muted)}.theme{border:1px solid var(--border);background:var(--panel);padding:12px 14px;border-radius:999px;cursor:pointer;color:var(--text)}
-    .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:24px}.card{background:color-mix(in srgb,var(--panel) 90%,transparent);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow)} .inner{padding:24px}.lead{margin:0 0 20px;color:var(--muted);max-width:70ch}
-    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px} label{display:block;font-weight:700;margin-bottom:8px} input,select,textarea{width:100%;padding:14px 15px;border-radius:var(--r2);border:1px solid var(--border);background:var(--panel);color:var(--text);outline:none;font-family:inherit}
-    input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 18%,transparent)} .hint{font-size:.9rem;color:var(--muted);margin-top:6px}.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px}
-    .btn{min-height:44px;padding:10px 14px;border-radius:999px;border:none;cursor:pointer;font-weight:700}.btn.primary{background:var(--primary);color:#fff}.btn.secondary{background:var(--primary-2);color:var(--text);border:1px solid var(--border)}
-    .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px}.stat,.box{padding:16px;border-radius:var(--r2);background:var(--panel);border:1px solid var(--border)}.stat span{display:block;color:var(--muted);font-size:.95rem;margin-bottom:6px}.stat strong{font-size:1.4rem}
-    .box h3{margin:0 0 10px;font-size:1rem}.box pre{margin:0;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.55;font-size:.9rem}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:'Satoshi',Arial,sans-serif;background:linear-gradient(180deg,var(--bg),var(--panel-2));color:var(--text)}
+    .wrap{max-width:1240px;margin:0 auto;padding:24px}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px}
+    .brand{display:flex;align-items:center;gap:14px}
+    .logo{width:46px;height:46px;border-radius:14px;background:var(--primary);display:grid;place-items:center;color:#fff;box-shadow:var(--shadow)}
+    .top h1{font-size:clamp(1.5rem,1.1rem + 1.8vw,2.5rem);margin:0}
+    .top p{margin:4px 0 0;color:var(--muted)}
+    .theme{border:1px solid var(--border);background:var(--panel);padding:12px 14px;border-radius:999px;cursor:pointer;color:var(--text)}
+    .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:24px}
+    .card{background:color-mix(in srgb,var(--panel) 90%,transparent);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow)}
+    .inner{padding:24px}
+    .lead{margin:0 0 20px;color:var(--muted);max-width:70ch}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+    label{display:block;font-weight:700;margin-bottom:8px}
+    input,select,textarea{width:100%;padding:14px 15px;border-radius:var(--r2);border:1px solid var(--border);background:var(--panel);color:var(--text);outline:none;font-family:inherit}
+    input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 18%,transparent)}
+    .hint{font-size:.9rem;color:var(--muted);margin-top:6px}
+    .actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px}
+    .btn{min-height:44px;padding:10px 14px;border-radius:999px;border:none;cursor:pointer;font-weight:700}
+    .btn.primary{background:var(--primary);color:#fff}
+    .btn.secondary{background:var(--primary-2);color:var(--text);border:1px solid var(--border)}
+    .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px}
+    .stat,.box{padding:16px;border-radius:var(--r2);background:var(--panel);border:1px solid var(--border)}
+    .stat span{display:block;color:var(--muted);font-size:.95rem;margin-bottom:6px}
+    .stat strong{font-size:1.4rem}
+    .box h3{margin:0 0 10px;font-size:1rem}
+    .box pre{margin:0;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.55;font-size:.9rem}
     .full{grid-column:1/-1}
     @media (max-width:960px){.hero{grid-template-columns:1fr}.grid,.stats{grid-template-columns:1fr}}
   </style>
@@ -25,7 +44,12 @@
   <div class="wrap">
     <div class="top">
       <div class="brand">
-        <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 6.5L12 3L20 6.5V17.5L12 21L4 17.5V6.5Z" stroke="currentColor" stroke-width="1.8"/><path d="M12 3V21M4 6.5L12 10L20 6.5" stroke="currentColor" stroke-width="1.8"/></svg></div>
+        <div class="logo">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M4 6.5L12 3L20 6.5V17.5L12 21L4 17.5V6.5Z" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M12 3V21M4 6.5L12 10L20 6.5" stroke="currentColor" stroke-width="1.8"/>
+          </svg>
+        </div>
         <div>
           <h1>Калькулятор MirVR + тексты для клиентов</h1>
           <p>Считает цену и формирует длинные и короткие сообщения (RU+UA) с именем клиента.</p>
@@ -317,7 +341,7 @@ function calc() {
   if (msgType === 'birthday') {
     const totalMinutes = end - start;
     // Ожидаем 4 часа (240 минут); если другое — считаем всё как обычное бронирование
-    if (totalMinutes >= 240 - 1) {
+    if (totalMinutes >= 239) {
       const banquet1Start = start;
       const banquet1End   = start + 30;          // 0:30
       const game1Start    = banquet1End;
@@ -327,10 +351,10 @@ function calc() {
       const game2Start    = banquet2End;
       const game2End      = end;                 // до конца
 
-      // Банкетные блоки — только отображаем, не считаем в тариф
+      // Банкетные блоки — только в тексте, не в расчёте
       extraLines.push(
-        `${fmtTime(banquet1Start)}–${fmtTime(banquet1End)} банкет (30 минут, не оплачивается)`,
-        `${fmtTime(banquet2Start)}–${fmtTime(banquet2End)} торжественная часть/торт (30 минут, не оплачивается)`
+        `${fmtTime(banquet1Start)}–${fmtTime(banquet1End)} банкет — 30 минут`,
+        `${fmtTime(banquet2Start)}–${fmtTime(banquet2End)} торжественная часть / торт — 30 минут`
       );
 
       // Считаем только игровые блоки (2×1.5 часа)
@@ -339,7 +363,7 @@ function calc() {
         ...buildSegments(game2Start, game2End, dayType.isWeekday)
       ];
     } else {
-      // если кто-то поставил не 4 часа — считаем всё время как раньше
+      // если поставили не 4 часа — считаем всё время как обычную бронь
       segments = buildSegments(start, end, dayType.isWeekday);
     }
   } else {
@@ -417,7 +441,7 @@ function calc() {
     `Время: ${startEl.value}–${endEl.value}`,
     '',
     ...(msgType === 'birthday'
-      ? ['Структура Дня рождения: 30 минут банкет, 1,5 часа игры, 30 минут торжественная часть/торт, 1,5 часа игры.']
+      ? ['Структура Дня рождения: 30 минут банкет, 1,5 часа игр, 30 минут торжественная часть / торт, 1,5 часа игр.']
       : []),
     ...(extraLines.length ? ['', ...extraLines] : []),
     '',
