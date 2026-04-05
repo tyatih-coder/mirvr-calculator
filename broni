@@ -1,1 +1,231 @@
+!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Калькулятор Дня Рождения в VR</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 20px; background:#f7f7f7; }
+    h1 { margin-bottom: 10px; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; align-items: center; }
+    label { min-width: 180px; }
+    input, select { padding: 4px 6px; }
+    button { padding: 8px 16px; cursor: pointer; }
+    .result { margin-top: 20px; padding: 16px; border-radius: 8px; background:#fff; border:1px solid #ddd; max-width: 720px; }
+    .schedule { margin-top: 10px; }
+    .schedule-item { margin-bottom: 4px; }
+    .hint { font-size: 13px; color:#666; }
+  </style>
+</head>
+<body>
+  <h1>Калькулятор Дня Рождения</h1>
+
+  <!-- Время праздника -->
+  <div class="row">
+    <label for="startTime">Начало праздника:</label>
+    <input type="time" id="startTime" value="16:00" />
+  </div>
+
+  <div class="row">
+    <label for="endTime">Конец праздника:</label>
+    <input type="time" id="endTime" value="20:00" />
+  </div>
+
+  <!-- Игровое время -->
+  <div class="row">
+    <label for="gameHours">Игровые часы (оплачиваемые):</label>
+    <input type="number" id="gameHours" min="1" step="0.5" value="3" />
+    <span class="hint">Админ задаёт, сколько часов игр покупает компания</span>
+  </div>
+
+  <!-- Игроки -->
+  <div class="row">
+    <label for="players">Количество детей:</label>
+    <input type="number" id="players" min="1" value="6" />
+  </div>
+
+  <div class="row">
+    <label for="birthdayIndex">Номер именинника:</label>
+    <select id="birthdayIndex"></select>
+    <span class="hint">Именинник получает скидку -50% на игры</span>
+  </div>
+
+  <!-- Тариф -->
+  <div class="row">
+    <label for="pricePerHour">Цена за 1 час игры (с ребёнка):</label>
+    <input type="number" id="pricePerHour" min="0" value="600" />
+  </div>
+
+  <button id="calcBtn">Рассчитать</button>
+
+  <div class="result" id="resultBlock" style="display:none;">
+    <div id="priceInfo"></div>
+    <div class="schedule" id="scheduleInfo"></div>
+  </div>
+
+  <script>
+    function timeToMinutes(t) {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    }
+
+    function minutesToTime(min) {
+      const h = Math.floor(min / 60) % 24;
+      const m = min % 60;
+      const hh = h.toString().padStart(2, '0');
+      const mm = m.toString().padStart(2, '0');
+      return hh + ':' + mm;
+    }
+
+    // наполняем селект с номером именинника
+    function renderBirthdaySelect() {
+      const players = parseInt(document.getElementById('players').value || '0', 10);
+      const select = document.getElementById('birthdayIndex');
+      select.innerHTML = '';
+      for (let i = 1; i <= players; i++) {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = 'Ребёнок ' + i;
+        select.appendChild(opt);
+      }
+    }
+
+    document.getElementById('players').addEventListener('input', renderBirthdaySelect);
+    renderBirthdaySelect();
+
+    function calcSchedule() {
+      const start = document.getElementById('startTime').value;
+      const end = document.getElementById('endTime').value;
+      const gameHours = parseFloat(document.getElementById('gameHours').value || '0');
+      const players = parseInt(document.getElementById('players').value || '0', 10);
+      const pricePerHour = parseFloat(document.getElementById('pricePerHour').value || '0');
+      const birthdayIndex = parseInt(document.getElementById('birthdayIndex').value || '1', 10);
+
+      const startMin = timeToMinutes(start);
+      const endMin = timeToMinutes(end);
+      const totalMinutes = endMin - startMin;
+
+      const resultBlock = document.getElementById('resultBlock');
+      const priceInfo = document.getElementById('priceInfo');
+      const scheduleInfo = document.getElementById('scheduleInfo');
+
+      if (totalMinutes <= 0 || gameHours <= 0 || players <= 0) {
+        resultBlock.style.display = 'none';
+        return;
+      }
+
+      // Игровые минуты по настройке
+      const gameMinutesTotal = Math.round(gameHours * 60);
+
+      // Проверка: в окне праздника должно хватить места на 30 банкет + игры + 30 торт
+      if (gameMinutesTotal + 60 > totalMinutes) {
+        resultBlock.style.display = 'block';
+        priceInfo.innerHTML = `
+          <p><strong>Ошибка:</strong> В выбранное окно не помещаются 30 минут банкета, ${gameMinutesTotal} минут игр и 30 минут торта.</p>
+        `;
+        scheduleInfo.innerHTML = '';
+        return;
+      }
+
+      // 60 минут — банкет (30) + торт (30)
+      const banquetMinutes = 30;
+      const cakeMinutes = 30;
+
+      let schedule = [];
+
+      // Схема времени:
+      // если игровых < 180 минут (3 ч) => короткий вариант: 30 / игры / 30
+      // если игровых >= 180 минут => длинный: 30 / X / 30 / X, где X = игровые/2
+      const banquetStart = startMin;
+      const banquetEnd = banquetStart + banquetMinutes;
+
+      if (gameMinutesTotal < 180) {
+        // Короткий вариант: 30 / игры / 30
+        const gamesStart = banquetEnd;
+        const gamesEnd = gamesStart + gameMinutesTotal;
+        const cakeStart = gamesEnd;
+        const cakeEnd = cakeStart + cakeMinutes;
+
+        schedule.push({ label: 'Банкет', from: banquetStart, to: banquetEnd });
+        schedule.push({ label: 'Игры (единый блок)', from: gamesStart, to: gamesEnd });
+        schedule.push({ label: 'Торт', from: cakeStart, to: cakeEnd });
+      } else {
+        // Длинный вариант: 30 / X / 30 / X
+        const halfGame = Math.round(gameMinutesTotal / 2);
+
+        const firstGamesStart = banquetEnd;
+        const firstGamesEnd = firstGamesStart + halfGame;
+
+        const cakeStart = firstGamesEnd;
+        const cakeEnd = cakeStart + cakeMinutes;
+
+        const secondGamesStart = cakeEnd;
+        const secondGamesEnd = secondGamesStart + halfGame;
+
+        schedule.push({ label: 'Банкет', from: banquetStart, to: banquetEnd });
+        schedule.push({ label: 'Игры (первый блок)', from: firstGamesStart, to: firstGamesEnd });
+        schedule.push({ label: 'Торт', from: cakeStart, to: cakeEnd });
+        schedule.push({ label: 'Игры (второй блок)', from: secondGamesStart, to: secondGamesEnd });
+      }
+
+      // ---------- РАСЧЁТ ЦЕНЫ ----------
+
+      const pricePerMinute = pricePerHour / 60;
+
+      // Минуты до 3-го часа и после 3-го часа
+      const fullPriceMinutes = Math.min(gameMinutesTotal, 120);     // первые 2 часа
+      const thirdHourMinutes = Math.max(gameMinutesTotal - 120, 0); // с 3-го часа и далее
+
+      let totalPrice = 0;
+
+      // Сначала все дети считаются без "именинник -50%", только с правилом "3-й час -50% на всех"
+      // Цена на одного "обычного" ребёнка:
+      const normalChildPrice =
+        fullPriceMinutes * pricePerMinute +           // первые 2 часа по 100%
+        thirdHourMinutes * pricePerMinute * 0.5;      // с 3-го часа по 50%
+
+      // Все дети как обычные
+      totalPrice = normalChildPrice * players;
+
+      // Теперь корректируем для именинника:
+      // у него может быть два варианта:
+      // 1) как у всех (правило 3-го часа)
+      const birthdayAsNormal = normalChildPrice;
+
+      // 2) "именинник -50% на все его минуты", а правило 3-го часа не добавляем отдельно
+      const birthdayAllMinutesHalf =
+        gameMinutesTotal * pricePerMinute * 0.5;
+
+      // Берём для именинника минимальную цену
+      const birthdayBest = Math.min(birthdayAsNormal, birthdayAllMinutesHalf);
+
+      // Вычитаем из общей суммы вариант "как обычный ребёнок" и добавляем лучший вариант для именинника
+      totalPrice = totalPrice - birthdayAsNormal + birthdayBest;
+
+      // ---------- ВЫВОД ----------
+
+      resultBlock.style.display = 'block';
+
+      priceInfo.innerHTML = `
+        <p><strong>Итого по играм:</strong> ${totalPrice.toFixed(0)} грн за ${players} детей.</p>
+        <p>Именинник (ребёнок №${birthdayIndex}) имеет скидку -50% на игры. 
+        С 3-го часа для всех детей действует -50% по тарифу, но скидки не суммируются — 
+        для именинника берётся самый выгодный вариант.</p>
+      `;
+
+      scheduleInfo.innerHTML = '<h3>Расписание праздника</h3>';
+      schedule.forEach(item => {
+        const line = document.createElement('div');
+        line.className = 'schedule-item';
+        line.textContent =
+          item.label + ': ' +
+          minutesToTime(item.from) + '–' + minutesToTime(item.to);
+        scheduleInfo.appendChild(line);
+      });
+    }
+
+    document.getElementById('calcBtn').addEventListener('click', calcSchedule);
+  </script>
+</body>
+</html>
+
 
