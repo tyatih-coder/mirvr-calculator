@@ -1,231 +1,543 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>Калькулятор Дня Рождения в VR</title>
+  <title>MirVR бронирование – калькулятор</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: system-ui, sans-serif; margin: 20px; background:#f7f7f7; }
-    h1 { margin-bottom: 10px; }
-    .row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; align-items: center; }
-    label { min-width: 180px; }
-    input, select { padding: 4px 6px; }
-    button { padding: 8px 16px; cursor: pointer; }
-    .result { margin-top: 20px; padding: 16px; border-radius: 8px; background:#fff; border:1px solid #ddd; max-width: 720px; }
-    .schedule { margin-top: 10px; }
-    .schedule-item { margin-bottom: 4px; }
-    .hint { font-size: 13px; color:#666; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:#0b0b12;
+      color:#f5f5f5;
+      margin:0;
+      padding:0;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+      text-align:center;
+    }
+    h2 {
+      font-size: 18px;
+      margin-top: 24px;
+      margin-bottom: 8px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background:#181825;
+      border-radius:8px;
+      padding:12px 14px;
+      box-shadow:0 2px 6px rgba(0,0,0,0.4);
+    }
+    label {
+      display:block;
+      font-size:14px;
+      margin:6px 0 2px;
+    }
+    input, select {
+      width:100%;
+      box-sizing:border-box;
+      padding:6px 8px;
+      border-radius:4px;
+      border:1px solid #444;
+      background:#0f0f19;
+      color:#f5f5f5;
+      font-size:14px;
+    }
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance:none;
+      margin:0;
+    }
+    input[type="checkbox"] {
+      width:auto;
+      margin-right:4px;
+    }
+    .inline {
+      display:flex;
+      align-items:center;
+      gap:6px;
+      margin:4px 0;
+      font-size:14px;
+    }
+    .btn {
+      display:inline-block;
+      margin-top:10px;
+      padding:8px 14px;
+      font-size:14px;
+      border-radius:4px;
+      border:none;
+      cursor:pointer;
+      background:#4c6fff;
+      color:#fff;
+    }
+    .btn:disabled {
+      opacity:0.6;
+      cursor:default;
+    }
+    .result {
+      font-size:15px;
+      line-height:1.4;
+    }
+    textarea {
+      width:100%;
+      min-height:220px;
+      box-sizing:border-box;
+      margin-top:6px;
+      padding:8px;
+      border-radius:4px;
+      border:1px solid #444;
+      background:#0f0f19;
+      color:#f5f5f5;
+      font-size:14px;
+      white-space:pre-wrap;
+    }
+    .small {
+      font-size:12px;
+      opacity:0.8;
+    }
+    .flex-row {
+      display:flex;
+      gap:8px;
+    }
+    .flex-row > div {
+      flex:1;
+    }
+    .pill {
+      display:inline-block;
+      padding:2px 8px;
+      border-radius:10px;
+      font-size:11px;
+      background:#33384d;
+      margin-left:6px;
+    }
+    @media (max-width:600px){
+      h1 { font-size:20px; }
+    }
   </style>
 </head>
 <body>
-  <h1>Калькулятор Дня Рождения</h1>
+<div class="container">
+  <h1>Калькулятор бронирования MirVR</h1>
+  <p class="small">
+    Тарифы: будни до 18:00 — 300 грн/час/чел; после 18:00 и выходные — 350 грн/час/чел;  
+    30 минут: будни до 18:00 — 175 грн/чел; после 18:00 и выходные — 200 грн/чел.
+  </p>
 
-  <!-- Время праздника -->
-  <div class="row">
-    <label for="startTime">Начало праздника:</label>
-    <input type="time" id="startTime" value="16:00" />
+  <div class="grid">
+    <!-- Общие данные -->
+    <div class="card">
+      <h2>Основная информация</h2>
+
+      <label>Имя клиента</label>
+      <input type="text" id="clientName" placeholder="Например: Андрій" />
+
+      <label>Имя администратора</label>
+      <input type="text" id="adminName" placeholder="Например: Яна" />
+
+      <label>Дата игры <span class="pill" id="dayInfo">день не выбран</span></label>
+      <input type="date" id="date" />
+
+      <div class="flex-row">
+        <div>
+          <label>Начало (часы:минуты)</label>
+          <input type="time" id="startTime" />
+        </div>
+        <div>
+          <label>Окончание</label>
+          <input type="time" id="endTime" />
+        </div>
+      </div>
+
+      <label>Количество участников (мест)</label>
+      <input type="number" id="players" min="1" value="1" />
+
+      <label>Длительность, минут (если не считать по времени выше)</label>
+      <input type="number" id="manualDuration" placeholder="Оставьте пустым, чтобы считать по времени начала и конца" min="0" />
+      <p class="small">
+        Если указана длительность вручную, время начала/окончания используется только для текста и определения до/после 18:00.
+      </p>
+
+      <label>
+        <input type="checkbox" id="needAdvance" />
+        Нужно сообщение с авансом 200 грн (обычно для выходных)
+      </label>
+
+      <label>
+        <input type="checkbox" id="questExtra" />
+        Клиент выбрал квест ( +50 грн/час/чел оплачивается отдельно, только упоминаем в тексте )
+      </label>
+    </div>
+
+    <!-- Скидки по игрокам -->
+    <div class="card">
+      <h2>Скидки по участникам</h2>
+      <p class="small">
+        Для каждого места укажите тип скидки. Скидка не суммируется (выберите только одну).
+      </p>
+
+      <div id="discountsContainer"></div>
+    </div>
+
+    <!-- Результат -->
+    <div class="card">
+      <h2>Расчёт</h2>
+      <button class="btn" id="calcBtn">Посчитать</button>
+      <div class="result" id="resultBlock" style="margin-top:10px;"></div>
+
+      <h2 style="margin-top:16px;">Текст для Viber</h2>
+      <label>Язык сообщения</label>
+      <select id="language">
+        <option value="uk">Українська</option>
+        <option value="ru">Русский</option>
+      </select>
+      <textarea id="messageText" readonly placeholder="Нажмите «Посчитать», чтобы сформировать текст."></textarea>
+      <p class="small">
+        Скопируйте текст и вставьте в Viber. Поддерживается базовое форматирование по правилам Viber (жирный, курсив и т.п.).[web:47]
+      </p>
+    </div>
   </div>
+</div>
 
-  <div class="row">
-    <label for="endTime">Конец праздника:</label>
-    <input type="time" id="endTime" value="20:00" />
-  </div>
+<script>
+  // Константы тарифов
+  const PRICE_WEEKDAY_HOUR = 300;
+  const PRICE_WEEKEND_HOUR = 350;
+  const PRICE_WEEKDAY_30 = 175;
+  const PRICE_WEEKEND_30 = 200;
 
-  <!-- Игровое время -->
-  <div class="row">
-    <label for="gameHours">Игровые часы (оплачиваемые):</label>
-    <input type="number" id="gameHours" min="1" step="0.5" value="3" />
-    <span class="hint">Админ задаёт, сколько часов игр покупает компания</span>
-  </div>
+  const playersInput = document.getElementById("players");
+  const discountsContainer = document.getElementById("discountsContainer");
+  const dateInput = document.getElementById("date");
+  const dayInfo = document.getElementById("dayInfo");
 
-  <!-- Игроки -->
-  <div class="row">
-    <label for="players">Количество детей:</label>
-    <input type="number" id="players" min="1" value="6" />
-  </div>
+  function getDayTypeFromDate(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr + "T00:00:00");
+    if (isNaN(d.getTime())) return null;
+    const day = d.getDay(); // 0=Sunday,6=Saturday[web:64]
+    if (day === 0 || day === 6) return "weekend";
+    return "weekday";
+  }
 
-  <div class="row">
-    <label for="birthdayIndex">Номер именинника:</label>
-    <select id="birthdayIndex"></select>
-    <span class="hint">Именинник получает скидку -50% на игры</span>
-  </div>
-
-  <!-- Тариф -->
-  <div class="row">
-    <label for="pricePerHour">Цена за 1 час игры (с ребёнка):</label>
-    <input type="number" id="pricePerHour" min="0" value="600" />
-  </div>
-
-  <button id="calcBtn">Рассчитать</button>
-
-  <div class="result" id="resultBlock" style="display:none;">
-    <div id="priceInfo"></div>
-    <div class="schedule" id="scheduleInfo"></div>
-  </div>
-
-  <script>
-    function timeToMinutes(t) {
-      const [h, m] = t.split(':').map(Number);
-      return h * 60 + m;
+  function updateDayInfo() {
+    const t = getDayTypeFromDate(dateInput.value);
+    if (!t) {
+      dayInfo.textContent = "день не выбран";
+      dayInfo.style.background = "#33384d";
+    } else if (t === "weekday") {
+      dayInfo.textContent = "будний";
+      dayInfo.style.background = "#235d3a";
+    } else {
+      dayInfo.textContent = "выходной";
+      dayInfo.style.background = "#8a2b2b";
     }
+  }
 
-    function minutesToTime(min) {
-      const h = Math.floor(min / 60) % 24;
-      const m = min % 60;
-      const hh = h.toString().padStart(2, '0');
-      const mm = m.toString().padStart(2, '0');
-      return hh + ':' + mm;
-    }
+  dateInput.addEventListener("change", updateDayInfo);
 
-    // наполняем селект с номером именинника
-    function renderBirthdaySelect() {
-      const players = parseInt(document.getElementById('players').value || '0', 10);
-      const select = document.getElementById('birthdayIndex');
-      select.innerHTML = '';
-      for (let i = 1; i <= players; i++) {
-        const opt = document.createElement('option');
-        opt.value = i;
-        opt.textContent = 'Ребёнок ' + i;
-        select.appendChild(opt);
-      }
-    }
-
-    document.getElementById('players').addEventListener('input', renderBirthdaySelect);
-    renderBirthdaySelect();
-
-    function calcSchedule() {
-      const start = document.getElementById('startTime').value;
-      const end = document.getElementById('endTime').value;
-      const gameHours = parseFloat(document.getElementById('gameHours').value || '0');
-      const players = parseInt(document.getElementById('players').value || '0', 10);
-      const pricePerHour = parseFloat(document.getElementById('pricePerHour').value || '0');
-      const birthdayIndex = parseInt(document.getElementById('birthdayIndex').value || '1', 10);
-
-      const startMin = timeToMinutes(start);
-      const endMin = timeToMinutes(end);
-      const totalMinutes = endMin - startMin;
-
-      const resultBlock = document.getElementById('resultBlock');
-      const priceInfo = document.getElementById('priceInfo');
-      const scheduleInfo = document.getElementById('scheduleInfo');
-
-      if (totalMinutes <= 0 || gameHours <= 0 || players <= 0) {
-        resultBlock.style.display = 'none';
-        return;
-      }
-
-      // Игровые минуты по настройке
-      const gameMinutesTotal = Math.round(gameHours * 60);
-
-      // Проверка: в окне праздника должно хватить места на 30 банкет + игры + 30 торт
-      if (gameMinutesTotal + 60 > totalMinutes) {
-        resultBlock.style.display = 'block';
-        priceInfo.innerHTML = `
-          <p><strong>Ошибка:</strong> В выбранное окно не помещаются 30 минут банкета, ${gameMinutesTotal} минут игр и 30 минут торта.</p>
-        `;
-        scheduleInfo.innerHTML = '';
-        return;
-      }
-
-      // 60 минут — банкет (30) + торт (30)
-      const banquetMinutes = 30;
-      const cakeMinutes = 30;
-
-      let schedule = [];
-
-      // Схема времени:
-      // если игровых < 180 минут (3 ч) => короткий вариант: 30 / игры / 30
-      // если игровых >= 180 минут => длинный: 30 / X / 30 / X, где X = игровые/2
-      const banquetStart = startMin;
-      const banquetEnd = banquetStart + banquetMinutes;
-
-      if (gameMinutesTotal < 180) {
-        // Короткий вариант: 30 / игры / 30
-        const gamesStart = banquetEnd;
-        const gamesEnd = gamesStart + gameMinutesTotal;
-        const cakeStart = gamesEnd;
-        const cakeEnd = cakeStart + cakeMinutes;
-
-        schedule.push({ label: 'Банкет', from: banquetStart, to: banquetEnd });
-        schedule.push({ label: 'Игры (единый блок)', from: gamesStart, to: gamesEnd });
-        schedule.push({ label: 'Торт', from: cakeStart, to: cakeEnd });
-      } else {
-        // Длинный вариант: 30 / X / 30 / X
-        const halfGame = Math.round(gameMinutesTotal / 2);
-
-        const firstGamesStart = banquetEnd;
-        const firstGamesEnd = firstGamesStart + halfGame;
-
-        const cakeStart = firstGamesEnd;
-        const cakeEnd = cakeStart + cakeMinutes;
-
-        const secondGamesStart = cakeEnd;
-        const secondGamesEnd = secondGamesStart + halfGame;
-
-        schedule.push({ label: 'Банкет', from: banquetStart, to: banquetEnd });
-        schedule.push({ label: 'Игры (первый блок)', from: firstGamesStart, to: firstGamesEnd });
-        schedule.push({ label: 'Торт', from: cakeStart, to: cakeEnd });
-        schedule.push({ label: 'Игры (второй блок)', from: secondGamesStart, to: secondGamesEnd });
-      }
-
-      // ---------- РАСЧЁТ ЦЕНЫ ----------
-
-      const pricePerMinute = pricePerHour / 60;
-
-      // Минуты до 3-го часа и после 3-го часа
-      const fullPriceMinutes = Math.min(gameMinutesTotal, 120);     // первые 2 часа
-      const thirdHourMinutes = Math.max(gameMinutesTotal - 120, 0); // с 3-го часа и далее
-
-      let totalPrice = 0;
-
-      // Сначала все дети считаются без "именинник -50%", только с правилом "3-й час -50% на всех"
-      // Цена на одного "обычного" ребёнка:
-      const normalChildPrice =
-        fullPriceMinutes * pricePerMinute +           // первые 2 часа по 100%
-        thirdHourMinutes * pricePerMinute * 0.5;      // с 3-го часа по 50%
-
-      // Все дети как обычные
-      totalPrice = normalChildPrice * players;
-
-      // Теперь корректируем для именинника:
-      // у него может быть два варианта:
-      // 1) как у всех (правило 3-го часа)
-      const birthdayAsNormal = normalChildPrice;
-
-      // 2) "именинник -50% на все его минуты", а правило 3-го часа не добавляем отдельно
-      const birthdayAllMinutesHalf =
-        gameMinutesTotal * pricePerMinute * 0.5;
-
-      // Берём для именинника минимальную цену
-      const birthdayBest = Math.min(birthdayAsNormal, birthdayAllMinutesHalf);
-
-      // Вычитаем из общей суммы вариант "как обычный ребёнок" и добавляем лучший вариант для именинника
-      totalPrice = totalPrice - birthdayAsNormal + birthdayBest;
-
-      // ---------- ВЫВОД ----------
-
-      resultBlock.style.display = 'block';
-
-      priceInfo.innerHTML = `
-        <p><strong>Итого по играм:</strong> ${totalPrice.toFixed(0)} грн за ${players} детей.</p>
-        <p>Именинник (ребёнок №${birthdayIndex}) имеет скидку -50% на игры. 
-        С 3-го часа для всех детей действует -50% по тарифу, но скидки не суммируются — 
-        для именинника берётся самый выгодный вариант.</p>
+  function renderDiscountInputs() {
+    const count = parseInt(playersInput.value || "0", 10);
+    discountsContainer.innerHTML = "";
+    for (let i = 1; i <= count; i++) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "inline";
+      const label = document.createElement("span");
+      label.textContent = "Игрок " + i + ":";
+      const select = document.createElement("select");
+      select.dataset.player = i;
+      select.innerHTML = `
+        <option value="none">Без скидки</option>
+        <option value="birthday">Именинник -50%</option>
+        <option value="zsu">ЗСУ -30%</option>
+        <option value="student">Студент -30%</option>
       `;
+      wrapper.appendChild(label);
+      wrapper.appendChild(select);
+      discountsContainer.appendChild(wrapper);
+    }
+  }
 
-      scheduleInfo.innerHTML = '<h3>Расписание праздника</h3>';
-      schedule.forEach(item => {
-        const line = document.createElement('div');
-        line.className = 'schedule-item';
-        line.textContent =
-          item.label + ': ' +
-          minutesToTime(item.from) + '–' + minutesToTime(item.to);
-        scheduleInfo.appendChild(line);
-      });
+  playersInput.addEventListener("change", () => {
+    if (parseInt(playersInput.value || "0", 10) < 1) playersInput.value = 1;
+    renderDiscountInputs();
+  });
+
+  // первичная отрисовка
+  renderDiscountInputs();
+
+  function parseTimeToMinutes(t) {
+    if (!t) return null;
+    const [h, m] = t.split(":").map(Number);
+    if (isNaN(h) || isNaN(m)) return null;
+    return h * 60 + m;
+  }
+
+  function detectPeriod(dayType, startMinutes, endMinutes) {
+    // Возвращает "weekday_before18" или "after18_or_weekend"
+    if (dayType === "weekend") return "after18_or_weekend";
+    const border = 18 * 60;
+    if (endMinutes !== null && endMinutes <= border) {
+      return "weekday_before18";
+    }
+    return "after18_or_weekend";
+  }
+
+  function calcBasePricePerPlayer(period, durationMinutes) {
+    if (!durationMinutes || durationMinutes <= 0) return 0;
+    if (durationMinutes <= 35) {
+      return period === "weekday_before18" ? PRICE_WEEKDAY_30 : PRICE_WEEKEND_30;
+    } else {
+      const hours = Math.ceil(durationMinutes / 60);
+      const pricePerHour = period === "weekday_before18" ? PRICE_WEEKDAY_HOUR : PRICE_WEEKEND_HOUR;
+      return hours * pricePerHour;
+    }
+  }
+
+  function applyDiscount(base, type) {
+    if (type === "birthday") return base * 0.5;
+    if (type === "zsu" || type === "student") return base * 0.7;
+    return base;
+  }
+
+  function formatDateForText(dateStr) {
+    if (!dateStr) return "xx.xx.2026";
+    const d = new Date(dateStr + "T00:00:00");
+    if (isNaN(d.getTime())) return "xx.xx.2026";
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}.${month}.${year}`;
+  }
+
+  function formatTimeForText(t) {
+    if (!t) return "xx:xx";
+    const [h, m] = t.split(":");
+    if (h === undefined || m === undefined) return "xx:xx";
+    return `${h.padStart(2,"0")}:${m.padStart(2,"0")}`;
+  }
+
+  function buildMessage(lang, withAdvance, data) {
+    const {
+      clientName,
+      adminName,
+      dateStr,
+      startStr,
+      endStr,
+      players,
+      totalPrice
+    } = data;
+
+    const clientPlaceholder = clientName || (lang === "uk" ? "ххх" : "ххх");
+    const adminPlaceholder = adminName || "ххххх";
+    const dateText = formatDateForText(dateStr);
+    const timeFromText = formatTimeForText(startStr);
+    const timeToText = formatTimeForText(endStr);
+    const priceText = totalPrice.toFixed(0);
+
+    const questLineUk = "+50 грн/год/люд доплата за квест, якщо його обрали на місці";
+    const questLineRu = "+50 грн/год/чел доплата за квест, если его выбрали на месте";
+
+    if (lang === "uk") {
+      if (!withAdvance) {
+        return (
+`Вітаємо, ${clientPlaceholder} 👋
+
+Ви забронювали ігровий час у клубі MirVR на:
+
+🔔 Дата: ${dateText}
+⌛️ Час: ${timeFromText} - ${timeToText}
+🎮 Кількість учасників: ${players}
+💰 Вартість: ${priceText} грн
+
+${questLineUk}
+
+Будемо раді бачити Вас у гостях за 5-10 хвилин до початку ігрового часу
+
+❗️ УВАГА ❗️
+* Якщо кількість гравців зменшиться або скоротиться ігровий час, оплата залишається 100%, а залишок коштів зараховується на баланс ігрового рахунку 
+* Якщо гравці додаються, погодьте будь ласка заздалегідь, інакше може не бути вільних місць 😢
+
+З повагою клуб віртуальної реальності MirVR, адміністратор ${adminPlaceholder} 😊
+-----------------------
+📞 093 942 34 70
+📍 Європейська, 89 (Катерининська)  
+🌐 https://mirvr.com.ua`);
+      } else {
+        return (
+`Вітаємо, ${clientPlaceholder} 👋
+
+Ви забронювали ігровий час у клубі MirVR на:
+
+🔔 Дата: ${dateText}
+⌛️ Час: ${timeFromText} - ${timeToText}
+🎮 Кількість учасників: ${players}
+💰 Вартість: ${priceText} грн
+
+${questLineUk}
+
+Будемо раді бачити Вас у гостях за 5-10 хвилин до початку ігрового часу
+
+Аванс 200 грн можна сплатити у нас у клубі, за номером картки нижче або за посиланням (суму потрібно вказати вручну):
+-----------------------
+4035200042439916
+
+Дімітрова Яна В'ячеславівна (Моно)
+
+https://pay.mbnk.biz/H3TxgYnnS2nX
+-----------------------
+❗️ УВАГА ❗️
+* Якщо кількість гравців зменшиться або скоротиться ігровий час, оплата залишається 100%, а залишок коштів зараховується на баланс ігрового рахунку.
+* Якщо гравці додаються, погодьте будь ласка заздалегідь, інакше може не бути вільних місць 😢
+
+З повагою клуб віртуальної реальності MirVR, адміністратор ${adminPlaceholder} 😊
+-----------------------
+📞 093 942 34 70
+📍 Європейська, 89 (Катерининська)  
+🌐 https://mirvr.com.ua`);
+      }
+    } else {
+      if (!withAdvance) {
+        return (
+`Здравствуйте, ${clientPlaceholder} 👋  
+
+Вы забронировали игровое время в клубе MirVR на:
+
+🔔 Дата: ${dateText}
+⌛️ Время: ${timeFromText} - ${timeToText}
+🎮 Количество участников: ${players}
+💰 Стоимость: ${priceText} грн
+
+${questLineRu}  
+
+Будем рады видеть вас за 5–10 минут до начала игрового времени.  
+
+❗️ ВНИМАНИЕ ❗️  
+* Если количество игроков уменьшится или сократится игровое время, оплата остаётся 100%, а остаток средств зачисляется на баланс игрового счёта.  
+* Если игроки добавляются, согласуйте, пожалуйста, заранее, иначе может не быть свободных мест 😢  
+
+С уважением, клуб виртуальной реальности MirVR, администратор ${adminPlaceholder} 😊  
+-----------------------  
+📞 093 942 34 70  
+📍 Европейская, 89 (Екатерининская)  
+🌐 https://mirvr.com.ua`);
+      } else {
+        return (
+`Здравствуйте, ${clientPlaceholder} 👋  
+
+Вы забронировали игровое время в клубе MirVR на:
+
+🔔 Дата: ${dateText}
+⌛️ Время: ${timeFromText} - ${timeToText}
+🎮 Количество участников: ${players}
+💰 Стоимость: ${priceText} грн
+
+${questLineRu}  
+
+Будем рады видеть вас за 5–10 минут до начала игрового времени.  
+
+Аванс 200 грн можно оплатить у нас в клубе, по номеру карты ниже или по ссылке (сумму нужно указать вручную):  
+-----------------------  
+4035200042439916  
+
+Димітрова Яна Вячеславовна (Моно)  
+
+https://pay.mbnk.biz/H3TxgYnnS2nX  
+-----------------------  
+❗️ ВНИМАНИЕ ❗️  
+* Если количество игроков уменьшится или сократится игровое время, оплата остаётся 100%, а остаток средств зачисляется на баланс игрового счёта.  
+* Если игроки добавляются, согласуйте, пожалуйста, заранее, иначе может не быть свободных мест 😢  
+
+С уважением, клуб виртуальной реальности MirVR, администратор ${adminPlaceholder} 😊  
+-----------------------  
+📞 093 942 34 70  
+📍 Европейская, 89 (Екатерининская)  
+🌐 https://mirvr.com.ua`);
+      }
+    }
+  }
+
+  document.getElementById("calcBtn").addEventListener("click", () => {
+    const clientName = document.getElementById("clientName").value.trim();
+    const adminName = document.getElementById("adminName").value.trim();
+    const dateStr = dateInput.value;
+    const dayType = getDayTypeFromDate(dateStr) || "weekday";
+    const startStr = document.getElementById("startTime").value;
+    const endStr = document.getElementById("endTime").value;
+    const manualDuration = parseInt(document.getElementById("manualDuration").value || "0", 10);
+    const players = parseInt(playersInput.value || "1", 10);
+    const needAdvance = document.getElementById("needAdvance").checked;
+
+    const startMin = parseTimeToMinutes(startStr);
+    const endMin = parseTimeToMinutes(endStr);
+
+    let durationMinutes = manualDuration > 0 ? manualDuration : 0;
+    if (!durationMinutes && startMin !== null && endMin !== null && endMin > startMin) {
+      durationMinutes = endMin - startMin;
+    }
+    if (!durationMinutes) {
+      alert("Введіть тривалість (час початку та кінця або хвилини).");
+      return;
     }
 
-    document.getElementById('calcBtn').addEventListener('click', calcSchedule);
-  </script>
+    const period = detectPeriod(dayType, startMin, endMin);
+    const basePerPlayer = calcBasePricePerPlayer(period, durationMinutes);
+
+    let total = 0;
+    const discountDetails = [];
+
+    const selects = discountsContainer.querySelectorAll("select");
+    selects.forEach((sel, index) => {
+      const type = sel.value;
+      const discounted = applyDiscount(basePerPlayer, type);
+      discountDetails.push({
+        player: index + 1,
+        type,
+        base: basePerPlayer,
+        final: discounted
+      });
+      total += discounted;
+    });
+
+    const resultBlock = document.getElementById("resultBlock");
+    let html = "";
+    html += `Тип дня: <b>${dayType === "weekday" ? "будний" : "выходной"}</b><br/>`;
+    html += `Базовый тариф за ${durationMinutes} хв для 1 игрока: <b>${basePerPlayer.toFixed(0)} грн</b><br/>`;
+    html += `Участников: ${players}<br/>`;
+    html += `<br/>По игрокам:<br/>`;
+    discountDetails.forEach(d => {
+      let t = "без скидки";
+      if (d.type === "birthday") t = "именинник -50%";
+      if (d.type === "zsu") t = "ЗСУ -30%";
+      if (d.type === "student") t = "студент -30%";
+      html += `Игрок ${d.player}: ${t}, сумма: ${d.final.toFixed(0)} грн<br/>`;
+    });
+    html += `<br/><b>Итого к оплате: ${total.toFixed(0)} грн</b>`;
+    html += `<br/><span class="small">Доплата за квест (+50 грн/год/чел) при необходимости берётся отдельно, сумма здесь не учитывается.</span>`;
+    resultBlock.innerHTML = html;
+
+    const lang = document.getElementById("language").value;
+    const msg = buildMessage(lang, needAdvance, {
+      clientName,
+      adminName,
+      dateStr,
+      startStr,
+      endStr,
+      players,
+      totalPrice: total
+    });
+    document.getElementById("messageText").value = msg;
+  });
+</script>
 </body>
 </html>
-
 
