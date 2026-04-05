@@ -13,7 +13,7 @@
       padding:0;
     }
     .container {
-      max-width: 900px;
+      max-width: 1100px;
       margin: 0 auto;
       padding: 16px;
     }
@@ -133,14 +133,17 @@
       font-size:13px;
       margin-top:6px;
     }
+    .summary-line {
+      margin-top:4px;
+    }
   </style>
 </head>
 <body>
 <div class="container">
   <h1>Калькулятор бронирования MirVR</h1>
   <p class="small">
-    Тарифы: будни до 18:00 — 300 грн/час/чел; после 18:00 и выходные — 350 грн/час/чел;
-    30 минут: будни до 18:00 — 175 грн/чел; после 18:00 и выходные — 200 грн/чел.
+    Тарифы: будни до 18:00 — 300 грн/час/чел; после 18:00 и выходные — 350 грн/час/чел.
+    Якщо бронь тільки 30 хв — 175 грн (до 18:00) або 200 грн (після 18:00/вихідні) за 1 гравця.
   </p>
 
   <div class="grid">
@@ -170,13 +173,14 @@
       <label>Количество участников (мест)</label>
       <input type="number" id="players" min="1" value="1" />
 
-      <p class="small">
-        Длительность берётся автоматически из времени начала и окончания. Ручного ввода минут больше нет.
-      </p>
-
       <label>
         <input type="checkbox" id="needAdvance" />
         Нужно сообщение с авансом 200 грн (обычно для выходных)
+      </label>
+
+      <label>
+        <input type="checkbox" id="questExtra" />
+        Клиент выбрал квест (+50 грн/час/чел)
       </label>
 
       <div id="validationError" class="error" style="display:none;"></div>
@@ -209,8 +213,9 @@
 <script>
   const PRICE_WEEKDAY_HOUR = 300;
   const PRICE_WEEKEND_HOUR = 350;
-  const PRICE_WEEKDAY_30 = 175;
-  const PRICE_WEEKEND_30 = 200;
+  const PRICE_30_ONLY_WEEKDAY = 175;
+  const PRICE_30_ONLY_WEEKEND = 200;
+  const QUEST_EXTRA_PER_HOUR_PER_PLAYER = 50;
 
   const playersInput = document.getElementById("players");
   const discountsContainer = document.getElementById("discountsContainer");
@@ -288,24 +293,58 @@
     return h * 60 + m;
   }
 
-  function detectPeriod(dayType, startMinutes, endMinutes) {
-    if (dayType === "weekend") return "after18_or_weekend";
-    const border = 18 * 60;
-    if (endMinutes !== null && endMinutes <= border) {
-      return "weekday_before18";
-    }
-    return "after18_or_weekend";
-  }
+  // расчёт стоимости за 1 игрока с разбивкой до/после 18:00
+  function calcPricePerPlayer(dayType, startMinutes, endMinutes) {
+    const totalMinutes = endMinutes - startMinutes;
+    if (totalMinutes <= 0) return { total: 0, before: 0, after: 0, only30TariffUsed: false };
 
-  function calcBasePricePerPlayer(period, durationMinutes) {
-    if (!durationMinutes || durationMinutes <= 0) return 0;
-    if (durationMinutes <= 35) {
-      return period === "weekday_before18" ? PRICE_WEEKDAY_30 : PRICE_WEEKEND_30;
-    } else {
-      const hours = Math.ceil(durationMinutes / 60);
-      const pricePerHour = period === "weekday_before18" ? PRICE_WEEKDAY_HOUR : PRICE_WEEKEND_HOUR;
-      return hours * pricePerHour;
+    const border = 18 * 60; // 18:00
+    const isWeekend = (dayType === "weekend");
+
+    // Если общая бронь ровно 30 минут и она полностью в одном тарифе — спецтариф 175/200
+    if (totalMinutes === 30) {
+      if (!isWeekend && endMinutes <= border) {
+        return { total: PRICE_30_ONLY_WEEKDAY, before: 30, after: 0, only30TariffUsed: true };
+      } else {
+        return { total: PRICE_30_ONLY_WEEKEND, before: 0, after: 30, only30TariffUsed: true };
+      }
     }
+
+    // Иначе считаем по минутам пропорционально часовому тарифу
+    let minutesBefore = 0;
+    let minutesAfter = 0;
+
+    if (!isWeekend) {
+      // будний: часть до 18:00 и после
+      if (endMinutes <= border) {
+        minutesBefore = totalMinutes;
+      } else if (startMinutes >= border) {
+        minutesAfter = totalMinutes;
+      } else {
+        // пересечение
+        minutesBefore = border - startMinutes;
+        minutesAfter  = endMinutes - border;
+      }
+    } else {
+      // выходной: весь день по "after" тарифу
+      minutesAfter = totalMinutes;
+    }
+
+    // цена за минуты как доля от часа
+    const priceBefore = (!isWeekend)
+      ? (minutesBefore / 60) * PRICE_WEEKDAY_HOUR
+      : 0;
+
+    const priceAfter = (minutesAfter / 60) * PRICE_WEEKEND_HOUR;
+
+    const total = priceBefore + priceAfter;
+
+    return {
+      total,
+      before: minutesBefore,
+      after: minutesAfter,
+      only30TariffUsed: false
+    };
   }
 
   function applyDiscount(base, type) {
@@ -515,23 +554,21 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
     const endStr = endInput.value;
     const players = parseInt(playersInput.value || "1", 10);
     const needAdvance = document.getElementById("needAdvance").checked;
+    const questExtraChecked = document.getElementById("questExtra").checked;
 
     const startMin = parseTimeToMinutes(startStr);
     const endMin = parseTimeToMinutes(endStr);
 
-    let durationMinutes = 0;
-    if (startMin !== null && endMin !== null && endMin > startMin) {
-      durationMinutes = endMin - startMin;
-    }
-    if (!durationMinutes) {
-      alert("Не удалось определить длительность. Проверьте время начала и окончания.");
+    const totalMinutes = endMin - startMin;
+    if (totalMinutes <= 0) {
+      alert("Проверьте время начала и окончания.");
       return;
     }
 
-    const period = detectPeriod(dayType, startMin, endMin);
-    const basePerPlayer = calcBasePricePerPlayer(period, durationMinutes);
+    const priceInfo = calcPricePerPlayer(dayType, startMin, endMin);
+    const basePerPlayer = priceInfo.total;
 
-    let total = 0;
+    let totalGame = 0;
     const discountDetails = [];
 
     const selects = discountsContainer.querySelectorAll("select");
@@ -544,15 +581,25 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
         base: basePerPlayer,
         final: discounted
       });
-      total += discounted;
+      totalGame += discounted;
     });
+
+    // квест: считаем по полным часам (вверх)
+    let questTotal = 0;
+    if (questExtraChecked) {
+      const hoursForQuest = Math.ceil(totalMinutes / 60);
+      questTotal = hoursForQuest * QUEST_EXTRA_PER_HOUR_PER_PLAYER * players;
+    }
+
+    const grandTotal = totalGame + questTotal;
 
     const resultBlock = document.getElementById("resultBlock");
     let html = "";
     html += `Тип дня: <b>${dayType === "weekday" ? "будний" : "выходной"}</b><br/>`;
-    html += `Длительность: <b>${durationMinutes}</b> мин<br/>`;
-    html += `Базовый тариф за эту длительность для 1 игрока: <b>${basePerPlayer.toFixed(0)} грн</b><br/>`;
+    html += `Длительность: <b>${totalMinutes}</b> мин (до 18:00: ${priceInfo.before} мин, после 18:00/выходной: ${priceInfo.after} мин)<br/>`;
+    html += `Цена за 1 игрока с учётом времени: <b>${basePerPlayer.toFixed(0)} грн</b><br/>`;
     html += `Участников: ${players}<br/>`;
+
     html += `<br/>По игрокам:<br/>`;
     discountDetails.forEach(d => {
       let t = "без скидки";
@@ -561,8 +608,15 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
       if (d.type === "student") t = "студент -30%";
       html += `Игрок ${d.player}: ${t}, сумма: ${d.final.toFixed(0)} грн<br/>`;
     });
-    html += `<br/><b>Итого к оплате: ${total.toFixed(0)} грн</b>`;
-    html += `<br/><span class="small">Доплата за квест (+50 грн/год/чел) при необходимости берётся отдельно, сумма здесь не учитывается.</span>`;
+
+    html += `<br/><div class="summary-line"><b>Итого за игру: ${totalGame.toFixed(0)} грн</b></div>`;
+    if (questExtraChecked) {
+      html += `<div class="summary-line">Доплата за квест: <b>${questTotal.toFixed(0)} грн</b> (по 50 грн/час/чел)</div>`;
+    } else {
+      html += `<div class="summary-line">Доплата за квест: не выбрана</div>`;
+    }
+    html += `<div class="summary-line"><b>Общая сумма: ${grandTotal.toFixed(0)} грн</b></div>`;
+
     resultBlock.innerHTML = html;
 
     const lang = document.getElementById("language").value;
@@ -573,7 +627,7 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
       startStr,
       endStr,
       players,
-      totalPrice: total
+      totalPrice: grandTotal
     });
     document.getElementById("messageText").value = msg;
   });
