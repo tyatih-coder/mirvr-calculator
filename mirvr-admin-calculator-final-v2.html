@@ -588,23 +588,24 @@ function calc() {
   perPlaceEl.textContent      = money(perPlace);
 
   const detail = [
-  `Имя клиента: ${clientNameEl.value || 'не указано'}`,
-  `Дата: ${gameDateEl.value || 'не выбрана'}`,
-  `Тип дня: ${dayType.label}`,
-  `Игровые места: ${places}`,
-  `Время: ${startEl.value}–${endEl.value}`,
-  '',
-  ...timelineText,
-  '',
-  ...(discountLines.length ? discountLines : []),
-  '',
-  `Итого за 1 место: ${money(perPlace)}`,
-  `Базовая сумма: ${money(baseTotal)}`,
-  extraDisc.title === 'Без дополнительных скидок'
+    `Имя клиента: ${clientNameEl.value || 'не указано'}`,
+    `Дата: ${gameDateEl.value || 'не выбрана'}`,
+    `Тип дня: ${dayType.label}`,
+    `Игровые места: ${places}`,
+    `Время: ${startEl.value}–${endEl.value}`,
+    '',
+    ...timelineText,
+    '',
+    ...(discountLines.length ? discountLines : []),
+    '',
+    `Итого за 1 место: ${money(perPlace)}`,
+    `Базовая сумма: ${money(baseTotal)}`,
+    extraDisc.title === 'Без дополнительных скидок'
       ? `Дополнительные скидки не применялись. Скидка 50% с ${DISCOUNT_START_HOUR}-го часа уже учтена.`
       : `${extraDisc.title}: ${money(extraDisc.amount)}`,
-  `Итого к оплате: ${money(finalTotal)}`
-].join('\n');
+    `Итого к оплате: ${money(finalTotal)}`
+  ].join('\n');
+
   partsViewEl.textContent = detail;
 
   const result = {
@@ -702,7 +703,7 @@ function generateMessages(ctx) {
 З повагою, клуб віртуальної реальності MirVR, адміністратор ${ADMIN} 😊
 -----------------------
 📞 093 942 34 70
-📍 Європейська, 89 (Катерининська)
+📍 Європейська, 89 (Катеринінська)
 🌐 https://mirvr.com.ua`;
   } else if (msgType === 'weekend') {
     ru = `Здравствуйте, ${CLIENT_NAME} 👋
@@ -764,7 +765,7 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
 З повагою, клуб віртуальної реальності MirVR, адміністратор ${ADMIN} 😊
 -----------------------
 📞 093 942 34 70
-📍 Європейська, 89 (Катерининська)
+📍 Європейська, 89 (Катеринінська)
 🌐 https://mirvr.com.ua`;
   } else if (msgType === 'birthday') {
     ru = `Здравствуйте, ${CLIENT_NAME}! ☀️
@@ -885,7 +886,7 @@ ${ctx.detail}
 З повагою, клуб віртуальної реальності MirVR, адміністратор ${ADMIN} 😊
 -----------------------
 📞 093 942 34 70
-📍 Європейська, 89 (Катерининська)
+📍 Європейська, 89 (Катеринінська)
 🌐 https://mirvr.com.ua/birthday`;
   }
 
