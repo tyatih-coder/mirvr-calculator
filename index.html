@@ -7,8 +7,8 @@
   <style>
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background:#0b0b12;
-      color:#f5f5f5;
+      background:#ffffff;
+      color:#111827;
       margin:0;
       padding:0;
     }
@@ -33,10 +33,11 @@
       gap: 16px;
     }
     .card {
-      background:#181825;
+      background:#f9fafb;
       border-radius:8px;
       padding:12px 14px;
-      box-shadow:0 2px 6px rgba(0,0,0,0.4);
+      box-shadow:0 1px 3px rgba(0,0,0,0.08);
+      border:1px solid #e5e7eb;
     }
     label {
       display:block;
@@ -48,10 +49,15 @@
       box-sizing:border-box;
       padding:6px 8px;
       border-radius:4px;
-      border:1px solid #444;
-      background:#0f0f19;
-      color:#f5f5f5;
+      border:1px solid #d1d5db;
+      background:#ffffff;
+      color:#111827;
       font-size:14px;
+    }
+    input:focus, select:focus {
+      outline:none;
+      border-color:#2563eb;
+      box-shadow:0 0 0 1px #2563eb33;
     }
     input[type="number"]::-webkit-outer-spin-button,
     input[type="number"]::-webkit-inner-spin-button {
@@ -77,8 +83,12 @@
       border-radius:4px;
       border:none;
       cursor:pointer;
-      background:#4c6fff;
+      background:#2563eb;
       color:#fff;
+    }
+    .btn:disabled {
+      opacity:0.5;
+      cursor:not-allowed;
     }
     .result {
       font-size:15px;
@@ -91,15 +101,15 @@
       margin-top:6px;
       padding:8px;
       border-radius:4px;
-      border:1px solid #444;
-      background:#0f0f19;
-      color:#f5f5f5;
+      border:1px solid #d1d5db;
+      background:#ffffff;
+      color:#111827;
       font-size:14px;
       white-space:pre-wrap;
     }
     .small {
       font-size:12px;
-      opacity:0.8;
+      color:#6b7280;
     }
     .flex-row {
       display:flex;
@@ -113,11 +123,15 @@
       padding:2px 8px;
       border-radius:10px;
       font-size:11px;
-      background:#33384d;
+      background:#e5e7eb;
       margin-left:6px;
     }
-    @media (max-width:600px){
-      h1 { font-size:20px; }
+    .pill.weekday { background:#bbf7d0; }
+    .pill.weekend { background:#fecaca; }
+    .error {
+      color:#b91c1c;
+      font-size:13px;
+      margin-top:6px;
     }
   </style>
 </head>
@@ -156,16 +170,16 @@
       <label>Количество участников (мест)</label>
       <input type="number" id="players" min="1" value="1" />
 
-      <label>Длительность, минут (если не считать по времени выше)</label>
-      <input type="number" id="manualDuration" placeholder="Оставьте пустым, чтобы считать по времени начала и конца" min="0" />
       <p class="small">
-        Если указана длительность вручную, время начала/окончания используется только для текста и определения до/после 18:00.
+        Длительность берётся автоматически из времени начала и окончания. Ручного ввода минут больше нет.
       </p>
 
       <label>
         <input type="checkbox" id="needAdvance" />
         Нужно сообщение с авансом 200 грн (обычно для выходных)
       </label>
+
+      <div id="validationError" class="error" style="display:none;"></div>
     </div>
 
     <div class="card">
@@ -178,7 +192,7 @@
 
     <div class="card">
       <h2>Расчёт</h2>
-      <button class="btn" id="calcBtn">Посчитать</button>
+      <button class="btn" id="calcBtn" disabled>Посчитать</button>
       <div class="result" id="resultBlock" style="margin-top:10px;"></div>
 
       <h2 style="margin-top:16px;">Текст для Viber</h2>
@@ -187,7 +201,7 @@
         <option value="uk">Українська</option>
         <option value="ru">Русский</option>
       </select>
-      <textarea id="messageText" readonly placeholder="Нажмите «Посчитать», чтобы сформировать текст."></textarea>
+      <textarea id="messageText" readonly placeholder="Заполните все поля и нажмите «Посчитать», чтобы сформировать текст."></textarea>
     </div>
   </div>
 </div>
@@ -202,6 +216,12 @@
   const discountsContainer = document.getElementById("discountsContainer");
   const dateInput = document.getElementById("date");
   const dayInfo = document.getElementById("dayInfo");
+  const clientInput = document.getElementById("clientName");
+  const adminInput = document.getElementById("adminName");
+  const startInput = document.getElementById("startTime");
+  const endInput = document.getElementById("endTime");
+  const calcBtn = document.getElementById("calcBtn");
+  const validationError = document.getElementById("validationError");
 
   function getDayTypeFromDate(dateStr) {
     if (!dateStr) return null;
@@ -214,19 +234,22 @@
 
   function updateDayInfo() {
     const t = getDayTypeFromDate(dateInput.value);
+    dayInfo.classList.remove("weekday","weekend");
     if (!t) {
       dayInfo.textContent = "день не выбран";
-      dayInfo.style.background = "#33384d";
     } else if (t === "weekday") {
       dayInfo.textContent = "будний";
-      dayInfo.style.background = "#235d3a";
+      dayInfo.classList.add("weekday");
     } else {
       dayInfo.textContent = "выходной";
-      dayInfo.style.background = "#8a2b2b";
+      dayInfo.classList.add("weekend");
     }
   }
 
-  dateInput.addEventListener("change", updateDayInfo);
+  dateInput.addEventListener("change", () => {
+    updateDayInfo();
+    validateForm();
+  });
 
   function renderDiscountInputs() {
     const count = parseInt(playersInput.value || "0", 10);
@@ -253,6 +276,7 @@
   playersInput.addEventListener("change", () => {
     if (parseInt(playersInput.value || "0", 10) < 1) playersInput.value = 1;
     renderDiscountInputs();
+    validateForm();
   });
 
   renderDiscountInputs();
@@ -447,26 +471,60 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
     }
   }
 
+  function validateForm() {
+    const errors = [];
+    if (!clientInput.value.trim()) errors.push("Имя клиента");
+    if (!adminInput.value.trim()) errors.push("Имя администратора");
+    if (!dateInput.value) errors.push("Дата");
+    if (!startInput.value) errors.push("Время начала");
+    if (!endInput.value) errors.push("Время окончания");
+    const players = parseInt(playersInput.value || "0",10);
+    if (!players || players < 1) errors.push("Количество участников");
+
+    const startMin = parseTimeToMinutes(startInput.value);
+    const endMin = parseTimeToMinutes(endInput.value);
+    if (startMin !== null && endMin !== null && endMin <= startMin) {
+      errors.push("Окончание должно быть позже начала");
+    }
+
+    if (errors.length > 0) {
+      validationError.style.display = "block";
+      validationError.textContent = "Заполните поля: " + errors.join(", ");
+      calcBtn.disabled = true;
+    } else {
+      validationError.style.display = "none";
+      calcBtn.disabled = false;
+    }
+  }
+
+  [clientInput, adminInput, dateInput, startInput, endInput].forEach(el => {
+    el.addEventListener("input", validateForm);
+    el.addEventListener("change", validateForm);
+  });
+  playersInput.addEventListener("input", validateForm);
+
   document.getElementById("calcBtn").addEventListener("click", () => {
-    const clientName = document.getElementById("clientName").value.trim();
-    const adminName = document.getElementById("adminName").value.trim();
+    validateForm();
+    if (calcBtn.disabled) return;
+
+    const clientName = clientInput.value.trim();
+    const adminName = adminInput.value.trim();
     const dateStr = dateInput.value;
     const dayType = getDayTypeFromDate(dateStr) || "weekday";
-    const startStr = document.getElementById("startTime").value;
-    const endStr = document.getElementById("endTime").value;
-    const manualDuration = parseInt(document.getElementById("manualDuration").value || "0", 10);
+    const startStr = startInput.value;
+    const endStr = endInput.value;
     const players = parseInt(playersInput.value || "1", 10);
     const needAdvance = document.getElementById("needAdvance").checked;
 
     const startMin = parseTimeToMinutes(startStr);
     const endMin = parseTimeToMinutes(endStr);
 
-    let durationMinutes = manualDuration > 0 ? manualDuration : 0;
-    if (!durationMinutes && startMin !== null && endMin !== null && endMin > startMin) {
+    let durationMinutes = 0;
+    if (startMin !== null && endMin !== null && endMin > startMin) {
       durationMinutes = endMin - startMin;
     }
     if (!durationMinutes) {
-      alert("Введіть тривалість (час початку та кінця або хвилини).");
+      alert("Не удалось определить длительность. Проверьте время начала и окончания.");
       return;
     }
 
@@ -492,7 +550,8 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
     const resultBlock = document.getElementById("resultBlock");
     let html = "";
     html += `Тип дня: <b>${dayType === "weekday" ? "будний" : "выходной"}</b><br/>`;
-    html += `Базовый тариф за ${durationMinutes} хв для 1 игрока: <b>${basePerPlayer.toFixed(0)} грн</b><br/>`;
+    html += `Длительность: <b>${durationMinutes}</b> мин<br/>`;
+    html += `Базовый тариф за эту длительность для 1 игрока: <b>${basePerPlayer.toFixed(0)} грн</b><br/>`;
     html += `Участников: ${players}<br/>`;
     html += `<br/>По игрокам:<br/>`;
     discountDetails.forEach(d => {
