@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Калькулятор MirVR + тексты для клиентов</title>
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#f7f6f2; --panel:#fcfbf8; --panel-2:#f1efea; --border:#d8d4cb; --text:#28251d; --muted:#6e6a63; --primary:#01696f; --primary-2:#e0efee; --accent:#964219; --ok:#2f6b20; --danger:#a13544; --shadow:0 10px 30px rgba(20,20,20,.08); --r:18px; --r2:14px; }
+    [data-theme="dark"] { --bg:#171614; --panel:#1d1c1a; --panel-2:#252320; --border:#3a3733; --text:#e6e1d8; --muted:#aaa49a; --primary:#4f98a3; --primary-2:#23363a; --accent:#d8a176; --ok:#86c56a; --danger:#df7d8b; --shadow:0 16px 36px rgba(0,0,0,.35); }
+    *{box-sizing:border-box} body{margin:0;font-family:'Satoshi',Arial,sans-serif;background:linear-gradient(180deg,var(--bg),var(--panel-2));color:var(--text)} .wrap{max-width:1240px;margin:0 auto;padding:24px}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px}.brand{display:flex;align-items:center;gap:14px}.logo{width:46px;height:46px;border-radius:14px;background:var(--primary);display:grid;place-items:center;color:#fff;box-shadow:var(--shadow)}
+    .top h1{font-size:clamp(1.5rem,1.1rem + 1.8vw,2.5rem);margin:0}.top p{margin:4px 0 0;color:var(--muted)}.theme{border:1px solid var(--border);background:var(--panel);padding:12px 14px;border-radius:999px;cursor:pointer;color:var(--text)}
+    .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:24px}.card{background:color-mix(in srgb,var(--panel) 90%,transparent);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow)} .inner{padding:24px}.lead{margin:0 0 20px;color:var(--muted);max-width:70ch}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px} label{display:block;font-weight:700;margin-bottom:8px} input,select,textarea{width:100%;padding:14px 15px;border-radius:var(--r2);border:1px solid var(--border);background:var(--panel);color:var(--text);outline:none;font-family:inherit}
+    input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 18%,transparent)} .hint{font-size:.9rem;color:var(--muted);margin-top:6px}.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px}
+    .btn{min-height:44px;padding:10px 14px;border-radius:999px;border:none;cursor:pointer;font-weight:700}.btn.primary{background:var(--primary);color:#fff}.btn.secondary{background:var(--primary-2);color:var(--text);border:1px solid var(--border)}
+    .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px}.stat,.box{padding:16px;border-radius:var(--r2);background:var(--panel);border:1px solid var(--border)}.stat span{display:block;color:var(--muted);font-size:.95rem;margin-bottom:6px}.stat strong{font-size:1.4rem}
+    .box h3{margin:0 0 10px;font-size:1rem}.box pre{margin:0;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.55;font-size:.9rem}
+    .full{grid-column:1/-1}
+    @media (max-width:960px){.hero{grid-template-columns:1fr}.grid,.stats{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">
+        <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 6.5L12 3L20 6.5V17.5L12 21L4 17.5V6.5Z" stroke="currentColor" stroke-width="1.8"/><path d="M12 3V21M4 6.5L12 10L20 6.5" stroke="currentColor" stroke-width="1.8"/></svg></div>
+        <div>
+          <h1>Калькулятор MirVR + тексты для клиентов</h1>
+          <p>Считает цену и формирует длинные и короткие сообщения (RU+UA) с именем клиента.</p>
+        </div>
+      </div>
+      <button class="theme" id="themeBtn">🌙 Тема</button>
+    </div>
+
+    <div class="hero">
+      <section class="card">
+        <div class="inner">
+          <p class="lead">Слева администратор считает стоимость и вводит данные бронирования. Справа выбирается тип сообщения: обычная бронь, выходной/праздник или День рождения (детальный сценарий).</p>
+          <div class="grid">
+            <div>
+              <label for="clientName">Имя клиента</label>
+              <input id="clientName" type="text" placeholder="Например, Оля" />
+            </div>
+            <div>
+              <label for="adminName">Имя администратора</label>
+              <input id="adminName" type="text" placeholder="Например, Яна" />
+            </div>
+            <div>
+              <label for="gameDate">Дата</label>
+              <input id="gameDate" type="date" />
+            </div>
+            <div>
+              <label>Тип дня</label>
+              <div id="dayTypeBadge" style="padding:10px 14px;border-radius:999px;border:1px solid var(--border);background:var(--panel-2);font-size:.9rem;font-weight:700">—</div>
+            </div>
+            <div>
+              <label for="start">Начало игры</label>
+              <input id="start" type="time" value="17:30" />
+            </div>
+            <div>
+              <label for="end">Конец игры</label>
+              <input id="end" type="time" value="20:30" />
+            </div>
+            <div>
+              <label for="places">Количество игровых мест</label>
+              <input id="places" type="number" min="1" step="1" value="6" />
+            </div>
+            <div>
+              <label for="discountType">Скидка</label>
+              <select id="discountType">
+                <option value="none">Без скидки</option>
+                <option value="birthday">Именинник</option>
+                <option value="zsu">ЗСУ 30%</option>
+                <option value="student">Студент 30%</option>
+              </select>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn primary" id="calcBtn">Посчитать</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="inner">
+          <div class="stats">
+            <div class="stat"><span>Итог к оплате</span><strong id="totalPay">0 грн</strong></div>
+            <div class="stat"><span>Базовая сумма без скидки</span><strong id="baseTotal">0 грн</strong></div>
+            <div class="stat"><span>Размер скидки</span><strong id="discountValue">0 грн</strong></div>
+            <div class="stat"><span>Стоимость за 1 место</span><strong id="perPlace">0 грн</strong></div>
+          </div>
+          <div class="box" style="margin-bottom:14px">
+            <h3>Разбивка</h3>
+            <pre id="partsView"></pre>
+          </div>
+          <div class="box">
+            <h3>Тип сообщения</h3>
+            <div class="grid">
+              <div>
+                <label for="msgType">Выберите формат</label>
+                <select id="msgType">
+                  <option value="weekday">Обычная бронь (будний)</option>
+                  <option value="weekend">Обычная бронь (выходной/праздник, аванс 200 грн)</option>
+                  <option value="birthday">День рождения (детальный сценарий, аванс 50%)</option>
+                </select>
+              </div>
+              <div>
+                <label>&nbsp;</label>
+                <button class="btn secondary" id="copyMsgBtn">Скопировать RU+UA</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:24px">
+      <div class="inner">
+        <div class="grid">
+          <div class="full">
+            <h3>Сообщение для клиента (RU)</h3>
+            <textarea id="msgRu" rows="14" readonly></textarea>
+          </div>
+          <div class="full" style="margin-top:16px">
+            <h3>Повідомлення для клієнта (UA)</h3>
+            <textarea id="msgUa" rows="20" readonly></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const RATE_BEFORE = 300;
+    const RATE_AFTER = 350;
+    const DISCOUNT_AFTER_HOURS = 2;
+    const THIRD_HOUR_DISCOUNT = 0.5;
+    const SWITCH_MINUTES = 18 * 60;
+
+    const gameDateEl = document.getElementById('gameDate');
+    const dayTypeBadgeEl = document.getElementById('dayTypeBadge');
+    const startEl = document.getElementById('start');
+    const endEl = document.getElementById('end');
+    const placesEl = document.getElementById('places');
+    const discountTypeEl = document.getElementById('discountType');
+    const adminNameEl = document.getElementById('adminName');
+    const clientNameEl = document.getElementById('clientName');
+
+    const totalPayEl = document.getElementById('totalPay');
+    const baseTotalEl = document.getElementById('baseTotal');
+    const discountValueEl = document.getElementById('discountValue');
+    const perPlaceEl = document.getElementById('perPlace');
+    const partsViewEl = document.getElementById('partsView');
+
+    const msgTypeEl = document.getElementById('msgType');
+    const msgRuEl = document.getElementById('msgRu');
+    const msgUaEl = document.getElementById('msgUa');
+
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    gameDateEl.value = `${yyyy}-${mm}-${dd}`;
+
+    function money(v){return new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(v)+' грн';}
+    function toMinutes(str){const [h,m]=str.split(':').map(Number);return h*60+m;}
+    function fmtTime(min){const h=Math.floor(min/60).toString().padStart(2,'0');const m=Math.floor(min%60).toString().padStart(2,'0');return `${h}:${m}`;}
+
+    function getDayType(){
+      if(!gameDateEl.value) return {isWeekday:true,label:'Дата не выбрана',short:'weekday'};
+      const d=new Date(gameDateEl.value+'T12:00:00');
+      const day=d.getDay();
+      const isWeekday=day>=1 && day<=5;
+      return {isWeekday,label:isWeekday?'Будний день':'Выходной/праздник',short:isWeekday?'weekday':'weekend'};
+    }
+
+    function buildSegments(start,end){
+      const out=[];let current=start;let played=0;
+      while(current<end){
+        const boundary=current<SWITCH_MINUTES?Math.min(end,SWITCH_MINUTES):end;
+        const durationHours=(boundary-current)/60;
+        const discountEligible=Math.max(0,(played+durationHours)-DISCOUNT_AFTER_HOURS);
+        const discountedHours=Math.min(durationHours,discountEligible);
+        const normalHours=durationHours-discountedHours;
+        out.push({start:current,end:boundary,period:current<SWITCH_MINUTES?'before':'after',rate:current<SWITCH_MINUTES?RATE_BEFORE:RATE_AFTER,durationHours,normalHours,discountedHours});
+        played+=durationHours;current=boundary;
+      }
+      return out;
+    }
+
+    function calculateDiscount(perPlace,baseTotal,places,discountType,isWeekday,before18Normal,before18Disc){
+      if(discountType==='birthday') return {title:'Скидка имениннику',amount:perPlace,note:'Скидка применена только на одного игрока.'};
+      if(discountType==='zsu') return {title:'Скидка ЗСУ 30%',amount:baseTotal*0.3,note:'Скидка 30% применена ко всему заказу.'};
+      if(discountType==='student'){
+        const eligiblePerPlace=before18Normal+before18Disc;
+        if(!isWeekday || eligiblePerPlace<=0) return {title:'Скидка студенту 30%',amount:0,note:'Студенческая скидка не действует: нужен будний день и игровое время до 18:00.'};
+        const eligible=eligiblePerPlace*places;
+        return {title:'Скидка студенту 30%',amount:eligible*0.3,note:'Студенческая скидка применена только к части времени до 18:00 в будний день.'};
+      }
+      return {title:'Без скидки',amount:0,note:'Скидка не выбрана.'};
+    }
+
+    function calc(){
+      const places=Math.max(1,Number(placesEl.value||1));
+      const start=toMinutes(startEl.value);
+      const end=toMinutes(endEl.value);
+      const discountType=discountTypeEl.value;
+      const dayType=getDayType();
+      dayTypeBadgeEl.textContent=dayType.label;
+
+      if(end<=start){
+        totalPayEl.textContent='Ошибка';baseTotalEl.textContent='—';discountValueEl.textContent='—';perPlaceEl.textContent='—';
+        partsViewEl.textContent='Время конца должно быть позже времени начала.';
+        msgRuEl.value='Исправьте время начала и конца.';
+        msgUaEl.value='Виправте час початку та завершення.';
+        return {baseTotal:0,finalTotal:0,perPlace:0,discount:{amount:0,title:'',note:''}};
+      }
+
+      const segments=buildSegments(start,end);
+      let perPlace=0;let before18Normal=0;let before18Disc=0;const lines=[];
+      segments.forEach(seg=>{
+        const normalCost=seg.normalHours*seg.rate;
+        const discountedCost=seg.discountedHours*seg.rate*(1-THIRD_HOUR_DISCOUNT);
+        perPlace+=normalCost+discountedCost;
+        if(seg.period==='before'){before18Normal+=normalCost;before18Disc+=discountedCost;}
+        const periodTitle=seg.period==='before'?'до 18:00':'после 18:00';
+        if(seg.normalHours>0) lines.push(`${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}): ${seg.normalHours.toFixed(2).replace('.',',')} ч × ${seg.rate} = ${money(normalCost)} за 1 место`);
+        if(seg.discountedHours>0) lines.push(`${fmtTime(seg.start)}–${fmtTime(seg.end)} скидочная часть: ${seg.discountedHours.toFixed(2).replace('.',',')} ч × ${seg.rate} × 50% = ${money(discountedCost)} за 1 место`);
+      });
+
+      const baseTotal=perPlace*places;
+      const discount=calculateDiscount(perPlace,baseTotal,places,discountType,dayType.isWeekday,before18Normal,before18Disc);
+      const finalTotal=Math.max(0,baseTotal-discount.amount);
+
+      totalPayEl.textContent=money(finalTotal);
+      baseTotalEl.textContent=money(baseTotal);
+      discountValueEl.textContent=money(discount.amount);
+      perPlaceEl.textContent=money(perPlace);
+
+      const detail=[
+        `Имя клиента: ${clientNameEl.value || 'не указано'}`,
+        `Дата: ${gameDateEl.value||'не выбрана'}`,
+        `Тип дня: ${dayType.label}`,
+        `Игровые места: ${places}`,
+        `Время: ${startEl.value}–${endEl.value}`,'',
+        ...lines,'',
+        `Итого за 1 место: ${money(perPlace)}`,
+        `Базовая сумма: ${money(baseTotal)}`,
+        `${discount.title}: ${money(discount.amount)}`,
+        `${discount.note}`,
+        `Итого к оплате: ${money(finalTotal)}`
+      ].join('
+');
+      partsViewEl.textContent=detail;
+
+      generateMessages({
+        date: gameDateEl.value,
+        timeFrom: startEl.value,
+        timeTo: endEl.value,
+        players: places,
+        price: finalTotal,
+        admin: adminNameEl.value || 'администратор',
+        client: clientNameEl.value || 'гость',
+        baseTotal,
+        perPlace,
+        finalTotal,
+        dayType: dayType.short
+      });
+
+      return {baseTotal,finalTotal,perPlace,discount};
+    }
+
+    function formatDateUaRu(dateStr){
+      if(!dateStr) return {ru:'',ua:''};
+      const [y,m,d]=dateStr.split('-');
+      const pretty=`${d}.${m}.${y}`;
+      return {ru:pretty,ua:pretty};
+    }
+
+    function generateMessages(ctx){
+      const d=formatDateUaRu(ctx.date);
+      const DATE_RU=d.ru, DATE_UA=d.ua;
+      const TIME_FROM=ctx.timeFrom, TIME_TO=ctx.timeTo;
+      const PLAYERS=ctx.players;
+      const PRICE=Math.round(ctx.price);
+      const ADMIN=ctx.admin || 'администратор';
+      const CLIENT_NAME = ctx.client || 'гость';
+
+      const totalHours=(toMinutes(TIME_TO)-toMinutes(TIME_FROM))/60;
+      const HOUR_PRICE = totalHours>0 ? Math.round(ctx.baseTotal / (totalHours*PLAYERS) || 0) : 0;
+      const HOURS = totalHours.toFixed(1).replace('.',',');
+      const CONSOLES = PLAYERS;
+      const BASE_TOTAL = Math.round(ctx.baseTotal);
+      const DISCOUNT_TOTAL = Math.round(ctx.finalTotal || ctx.baseTotal);
+      const DEPOSIT = Math.round((ctx.finalTotal || ctx.baseTotal) * 0.5);
+
+      const msgType = msgTypeEl.value;
+
+      let ru='', ua='';
+      if(msgType==='weekday'){
+        ru = `Здравствуйте, ${CLIENT_NAME} 👋
+
+Вы забронировали игровое время в клубе MirVR на:
+
+🔔 Дата: ${DATE_RU}
+⌛️ Время: ${TIME_FROM} – ${TIME_TO}
+🎮 Количество участников: ${PLAYERS}
+💰 Стоимость: ${PRICE} грн
+
++50 грн/час/чел доплата за квест, если вы выберете его на месте.
+
+Будем рады видеть вас за 5–10 минут до начала игрового времени.
+
+❗️ ВНИМАНИЕ ❗️
+* Если количество игроков уменьшится или сократится игровое время, оплата остаётся 100%, а остаток средств зачисляется на баланс игрового счёта.
+* Если игроки добавляются, пожалуйста, согласуйте это заранее, иначе может не быть свободных мест 😢
+
+С уважением, клуб виртуальной реальности MirVR, администратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Европейская, 89 (Екатерининская)
+🌐 https://mirvr.com.ua`;
+
+        ua = `Вітаємо, ${CLIENT_NAME} 👋
+
+Ви забронювали ігровий час у клубі MirVR на:
+
+🔔 Дата: ${DATE_UA}
+⌛️ Час: ${TIME_FROM} – ${TIME_TO}
+🎮 Кількість учасників: ${PLAYERS}
+💰 Вартість: ${PRICE} грн
+
++50 грн/год/люд доплата за квест, якщо ви оберете його на місці.
+
+Будемо раді бачити вас у гостях за 5–10 хвилин до початку ігрового часу.
+
+❗️ УВАГА ❗️
+* Якщо кількість гравців зменшиться або скоротиться ігровий час, оплата залишається 100%, а залишок коштів зараховується на баланс ігрового рахунку.
+* Якщо гравці додаються, погодьте, будь ласка, заздалегідь, інакше може не бути вільних місць 😢
+
+З повагою, клуб віртуальної реальності MirVR, адміністратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Європейська, 89 (Катерининська)
+🌐 https://mirvr.com.ua`;
+      } else if(msgType==='weekend'){
+        ru = `Здравствуйте, ${CLIENT_NAME} 👋
+
+Вы забронировали игровое время в клубе MirVR на:
+
+🔔 Дата: ${DATE_RU}
+⌛️ Время: ${TIME_FROM} – ${TIME_TO}
+🎮 Количество участников: ${PLAYERS}
+💰 Стоимость: ${PRICE} грн
+
++50 грн/час/чел доплата за квест, если вы выберете его на месте.
+
+Будем рады видеть вас за 5–10 минут до начала игрового времени.
+
+Аванс 200 грн можно оплатить у нас в клубе, по номеру карты ниже или по ссылке (сумму нужно указать вручную):
+-----------------------
+4035200042439916
+
+Димитрова Яна Вячеславовна (Моно)
+
+https://pay.mbnk.biz/H3TxgYnnS2nX
+-----------------------
+❗️ ВНИМАНИЕ ❗️
+* Если количество игроков уменьшится или сократится игровое время, оплата остаётся 100%, а остаток средств зачисляется на баланс игрового счёта.
+* Если игроки добавляются, пожалуйста, согласуйте это заранее, иначе может не быть свободных мест 😢
+
+С уважением, клуб виртуальной реальности MirVR, администратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Европейская, 89 (Екатерининская)
+🌐 https://mirvr.com.ua`;
+
+        ua = `Вітаємо, ${CLIENT_NAME} 👋
+
+Ви забронювали ігровий час у клубі MirVR на:
+
+🔔 Дата: ${DATE_UA}
+⌛️ Час: ${TIME_FROM} – ${TIME_TO}
+🎮 Кількість учасників: ${PLAYERS}
+💰 Вартість: ${PRICE} грн
+
++50 грн/год/люд доплата за квест, якщо ви оберете його на місці.
+
+Будемо раді бачити вас у гостях за 5–10 хвилин до початку ігрового часу.
+
+Аванс 200 грн можна сплатити у нас у клубі, за номером картки нижче або за посиланням (суму потрібно вказати вручну):
+-----------------------
+4035200042439916
+
+Дімітрова Яна В’ячеславівна (Моно)
+
+https://pay.mbnk.biz/H3TxgYnnS2nX
+-----------------------
+❗️ УВАГА ❗️
+* Якщо кількість гравців зменшиться або скоротиться ігровий час, оплата залишається 100%, а залишок коштів зараховується на баланс ігрового рахунку.
+* Якщо гравці додаються, погодьте, будь ласка, заздалегідь, інакше може не бути вільних місць 😢
+
+З повагою, клуб віртуальної реальності MirVR, адміністратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Європейська, 89 (Катерининська)
+🌐 https://mirvr.com.ua`;
+      } else if(msgType==='birthday'){
+        ru = `Вітаємо, ${CLIENT_NAME}! ☀️ (RU версия ниже — адаптирована)
+
+Клуб виртуальной реальности MirVR рад предложить вам организацию Дня рождения.
+
+Ниже указаны основные моменты проведения праздника. Если у вас останутся вопросы — с радостью обсудим! 😊
+
+1️⃣ Встреча гостей и банкет
+На сбор гостей и банкет обычно уходит около 30 минут, после чего дети с удовольствием переходят к играм.
+
+2️⃣ Игровое время
+Стандартное игровое время — 3 часа. За это время гости могут пройти квесты или поиграть в командные и одиночные игры. По желанию можно забронировать 2 или 4 часа.
+
+3️⃣ Торжественная часть
+После игр — около 30 минут на торт, поздравления именинника, пиньяту и настольные игры. Этого достаточно, чтобы всем было весело и никто не успел заскучать.
+
+4️⃣ Индивидуальность
+Если вы хотите, чтобы во время праздника в клубе не было других посетителей, потрібно забронювати всі ігрові консолі (полная аренда). В противном случае в клубе могут быть и другие гости.
+
+5️⃣ Заказ еды
+Вы можете заказать еду самостоятельно по нашему адресу или отправить нам скрин выбранных блюд — мы всё оформим за вас, чтобы вам не пришлось тратить время на звонки с курьером.
+Наш магазин: https://mirvr.wayforpay.shop
+Партнёры:
+https://delivery.pomodoro.od.ua/restaurants/4
+https://smilefood.od.ua
+
+6️⃣ Игровые места
+В клубе есть 11 беспроводных VR-очков Oculus Quest 2 и 3, а также PlayStation:
+- 4 места в первом зале
+- 4 места во втором зале
+- 3 места в третьем зале
+- 2 VIP-комнаты PlayStation 5
+- PlayStation 4 PRO + VR + Just Dance
+Игры запускаются по очереди под контролем администратора. В нашем каталоге более 100 игр и около 20 уникальных квестов.
+
+7️⃣ Цены
+VR:
+- Будни с 11:00 до 18:00: 300 грн/час/чел
+- После 18:00 и в выходные: 350 грн/час/чел
+PlayStation (до 4 игроков):
+- Будни с 11:00 до 18:00: 300 грн/час
+- После 18:00 и в выходные: 350 грн/час
+Квесты: +50 грн/чел/час.
+Настольные игры и твистер — бесплатно.
+При предварительном бронировании дарим скидку 50% на все игровые места с третьего часа.
+
+8️⃣ Форс-мажор
+Если меняется количество гостей, желательно предупредить минимум за 4 дня до праздника, чтобы мы пересчитали бронь. Если гостей пришло меньше или произошёл форс-мажор, невикористана сума або аванс зараховуються на персональний рахунок в клубі. Использовать эти средства может один человек в течение 6 месяцев.
+
+9️⃣ Расчёт и тайминг под ваш запрос
+Дата: ${DATE_UA}
+Точный тайминг (по договорённости):
+- Сбор гостей и банкет
+- Игры и танцы
+- Торт и поздравления
+- Игры и сбор банкета
+
+Пожалуйста, приходите не раньше согласованного времени — до этого в клубе может проходить другое мероприятие.
+
+💰 Расчёт:
+${HOUR_PRICE} грн/час * ${CONSOLES} консолей * ${HOURS} часа = ${BASE_TOTAL} грн.
+Со скидкой за 3-й час: ${DISCOUNT_TOTAL} грн + 50 грн/чел за квесты (по желанию на месте).
+
+🔟 Аванс
+Для бронирования необходимо внести аванс — ${DEPOSIT} грн (50%). Чем раньше, тем лучше, так как места могут быть заняты другими клиентами. Оплатить можно в клубе или по ссылке (отправим отдельно).
+
+❗️Аванс не возвращается, но гарантирует броннирование игровых мест❗️
+
+Отзывы: https://g.page/r/CS-kLQe9DbDjEBM
+
+С уважением, клуб виртуальной реальности MirVR, администратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Европейская, 89 (Екатерининская)
+🌐 https://mirvr.com.ua/birthday`;
+
+        ua = `Вітаємо, ${CLIENT_NAME}! ☀️
+
+Клуб віртуальної реальності MirVR радий запропонувати Вам організацію 🥳 Дня народження 🥳
+
+Нижче наведені основні моменти проведення заходу. Якщо у Вас залишаться питання, з радістю обговоримо! 😊
+
+1️⃣ Зустріч гостей та банкет
+На збори та банкет зазвичай йде близько 30 хвилин, після чого діти з задоволенням переходять до ігор.
+
+2️⃣ Ігровий час
+Стандартний ігровий час — 3 години. За цей час гості можуть пройти квести або пограти в командні та одиночні ігри. Але Ви можете забронювати як 2, так і 4 години ігор на свій розсуд.
+
+3️⃣ Урочиста частина
+Після ігор — близько 30 хвилин на торт, привітання іменинника, піньяту та настільні ігри. Цього часу достатньо, щоб ніхто не почав нудьгувати.
+
+4️⃣ Індивідуальність
+Якщо хочете, щоб під час свята в клубі не було інших відвідувачів, потрібно забронювати всі ігрові консолі. В іншому випадку можуть бути інші гості клубу.
+
+5️⃣ Замовлення їжі
+То що робимо ми:
+https://mirvr.wayforpay.shop
+Наші партнери:
+https://delivery.pomodoro.od.ua/restaurants/4
+https://smilefood.od.ua
+Ви можете зробити замовлення самостійно за нашою адресою або надіслати нам скрін вибраних страв, і ми із задоволенням оформимо все за вас, щоб вам не довелося витрачати час на дзвінки з кур’єром.
+
+6️⃣ Ігрові місця
+У клубі є 11 бездротових VR-гарнітур Oculus Quest 2 та 3, а також PlayStation:
+✅ 4 місця в першій залі
+✅ 4 місця в другій залі
+✅ 3 місця в третій залі
+✅ 2 VIP-кімнати PlayStation 5
+✅ PlayStation 4 PRO + VR + Just Dance
+Ігри запускаються в порядку черги під керівництвом адміністратора. У нас більше 100 ігор та близько 20 унікальних квестів.
+
+7️⃣ Ціни
+✅ VR:
+- Будні дні з 11:00 до 18:00: 300 грн/год/особа
+- Після 18:00 та вихідні: 350 грн/год/особа
+✅ PlayStation (до 4 гравців):
+- Будні дні з 11:00 до 18:00: 300 грн/год
+- Після 18:00 та вихідні: 350 грн/год
+✅ Квести: +50 грн/особа/год.
+Настільні ігри та твістер — безкоштовно.
+При попередньому бронюванні даруємо знижку 50% на всі ігрові місця з третьої години, на честь свята.
+
+8️⃣ Форс-мажор
+Якщо кількість гостей змінюється, необхідно повідомити мінімум за 4 дні до заходу для перерахунку. Якщо гостей прийшло менше або стався форс-мажор, невикористана сума або аванс зараховуються на персональний рахунок в нашому клубі.
+Використати ці кошти може лише одна особа протягом 6 місяців.
+
+9️⃣ Розрахунок та таймінг за Вашим запитом
+${DATE_UA}
+Точний таймінг узгоджуємо індивідуально (збір гостей, ігри, торт, завершення).
+Будь ласка, приходьте не раніше узгодженого часу, оскільки до цього в клубі може проходити інший захід.
+
+💰 Розрахунок:
+${HOUR_PRICE} грн/год * ${CONSOLES} консолей * ${HOURS} години = ${BASE_TOTAL} грн.
+Зі знижкою за 3-ю годину: ${DISCOUNT_TOTAL} грн + 50 грн/особа за квести.
+
+🔟 Аванс
+Для бронювання необхідно внести аванс — ${DEPOSIT} грн (50%). Чим раніше, тим краще, оскільки місця можуть бути зайняті іншими клієнтами. Оплатити можна в клубі або за посиланням (відправимо окремо).
+
+❗️Аванс не повертається, але гарантує бронювання ігрових місць❗️
+
+ВІДГУКИ: https://g.page/r/CS-kLQe9DbDjEBM
+
+З повагою клуб віртуальної реальності MirVR, адміністратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Європейська, 89 (Катерининська)
+🌐 https://mirvr.com.ua/birthday`;
+      }
+
+      msgRuEl.value = ru;
+      msgUaEl.value = ua;
+    }
+
+    document.getElementById('calcBtn').addEventListener('click', calc);
+    [gameDateEl,startEl,endEl,placesEl,discountTypeEl,msgTypeEl,adminNameEl,clientNameEl].forEach(el=>el.addEventListener('input',calc));
+
+    document.getElementById('copyMsgBtn').addEventListener('click', async ()=>{
+      try{
+        const txt = msgRuEl.value + '
+
+---
+
+' + msgUaEl.value;
+        await navigator.clipboard.writeText(txt);
+        const btn=document.getElementById('copyMsgBtn');
+        const prev=btn.textContent;btn.textContent='Скопировано';setTimeout(()=>btn.textContent=prev,1200);
+      }catch(e){}
+    });
+
+    document.getElementById('themeBtn').addEventListener('click',()=>{
+      const root=document.documentElement;
+      root.setAttribute('data-theme',root.getAttribute('data-theme')==='dark'?'light':'dark');
+    });
+
+    calc();
+  </script>
+</body>
+</html>
