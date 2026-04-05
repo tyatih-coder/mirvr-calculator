@@ -136,7 +136,7 @@
 const RATE_WEEKDAY_BEFORE_18 = 300;
 const RATE_WEEKDAY_AFTER_18  = 350;
 const RATE_WEEKEND           = 350;
-const DISCOUNT_AFTER_HOURS   = 2;   // после 2-го часа
+const DISCOUNT_AFTER_HOURS   = 2;   // после 2-го часа идёт скидка
 const THIRD_HOUR_DISCOUNT    = 0.5; // 50%
 const SWITCH_MINUTES         = 18 * 60;
 
@@ -192,7 +192,7 @@ function getDayType() {
   };
 }
 
-// делим интервал на сегменты, учитывая будни/выходные и 18:00
+// Делим интервал на сегменты, учитывая будни/выходные и 18:00
 function buildSegments(start, end, isWeekday) {
   const out = [];
   let current = start;
@@ -241,7 +241,7 @@ function buildSegments(start, end, isWeekday) {
   return out;
 }
 
-// дополнительные скидки (именинник, ЗСУ, студент)
+// Дополнительные скидки (именинник, ЗСУ, студент)
 function calculateDiscount(perPlace, baseTotal, places, discountType, isWeekday, before18Normal, before18Disc) {
   if (discountType === 'birthday') {
     return {
@@ -308,7 +308,45 @@ function calc() {
     };
   }
 
-  const segments = buildSegments(start, end, dayType.isWeekday);
+  const msgType = msgTypeEl.value;
+
+  let segments = [];
+  const extraLines = [];
+
+  // Специальный сценарий для Дня рождения: 0:00–0:30 банкет, 0:30–2:00 игры, 2:00–2:30 торт, 2:30–4:00 игры
+  if (msgType === 'birthday') {
+    const totalMinutes = end - start;
+    // Ожидаем 4 часа (240 минут); если другое — считаем всё как обычное бронирование
+    if (totalMinutes >= 240 - 1) {
+      const banquet1Start = start;
+      const banquet1End   = start + 30;          // 0:30
+      const game1Start    = banquet1End;
+      const game1End      = game1Start + 90;     // 2:00
+      const banquet2Start = game1End;
+      const banquet2End   = banquet2Start + 30;  // 2:30
+      const game2Start    = banquet2End;
+      const game2End      = end;                 // до конца
+
+      // Банкетные блоки — только отображаем, не считаем в тариф
+      extraLines.push(
+        `${fmtTime(banquet1Start)}–${fmtTime(banquet1End)} банкет (30 минут, не оплачивается)`,
+        `${fmtTime(banquet2Start)}–${fmtTime(banquet2End)} торжественная часть/торт (30 минут, не оплачивается)`
+      );
+
+      // Считаем только игровые блоки (2×1.5 часа)
+      segments = [
+        ...buildSegments(game1Start, game1End, dayType.isWeekday),
+        ...buildSegments(game2Start, game2End, dayType.isWeekday)
+      ];
+    } else {
+      // если кто-то поставил не 4 часа — считаем всё время как раньше
+      segments = buildSegments(start, end, dayType.isWeekday);
+    }
+  } else {
+    // Обычные брони
+    segments = buildSegments(start, end, dayType.isWeekday);
+  }
+
   let perPlace       = 0;
   let before18Normal = 0;
   let before18Disc   = 0;
@@ -378,7 +416,10 @@ function calc() {
     `Игровые места: ${places}`,
     `Время: ${startEl.value}–${endEl.value}`,
     '',
-    'Банкет: 30 минут до начала и 30 минут после/внутри игрового времени не оплачиваются, но входят в общее время праздника.',
+    ...(msgType === 'birthday'
+      ? ['Структура Дня рождения: 30 минут банкет, 1,5 часа игры, 30 минут торжественная часть/торт, 1,5 часа игры.']
+      : []),
+    ...(extraLines.length ? ['', ...extraLines] : []),
     '',
     ...lines,
     '',
@@ -437,8 +478,6 @@ function generateMessages(ctx) {
 
   const totalHours     = (toMinutes(TIME_TO) - toMinutes(TIME_FROM)) / 60;
   const HOUR_PRICE     = totalHours > 0 ? Math.round(ctx.baseTotal / (totalHours * PLAYERS) || 0) : 0;
-  const HOURS          = totalHours.toFixed(1).replace('.', ',');
-  const CONSOLES       = PLAYERS;
   const BASE_TOTAL     = Math.round(ctx.baseTotal);
   const DISCOUNT_TOTAL = Math.round(ctx.finalTotal || ctx.baseTotal);
   const DEPOSIT        = Math.round((ctx.finalTotal || ctx.baseTotal) * 0.5);
@@ -576,7 +615,7 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
 Ещё около 30 минут банкета может проходить после или внутри игрового времени — эти 60 минут не оплачиваются, но входят в общее время праздника.
 
 2️⃣ Игровое время
-Стандартное игровое время — 3 часа. Можно забронировать 2 или 4 часа.
+Стандартное игровое время — 3 часа (1,5 часа игр + 30 минут торта + 1,5 часа игр). Можно забронировать и другие варианты, но в этом сценарии расчёт идёт именно за 3 часа игр.
 
 3️⃣ Торжественная часть
 После игр — около 30 минут на торт, поздравления именинника, пиньяту и настольные игры.
@@ -638,7 +677,7 @@ ${ctx.detail}
 Ще близько 30 хвилин банкету може проходити після або всередині ігрового часу — ці 60 хвилин не оплачуються, але входять у загальний час свята.
 
 2️⃣ Ігровий час
-Стандартний ігровий час — 3 години (можна забронювати 2 або 4 години).
+Стандартний ігровий час — 3 години (1,5 години ігор + 30 хвилин торта + 1,5 години ігор). У цьому сценарії оплачується саме 3 години ігор.
 
 3️⃣ Урочиста частина
 Після ігор — приблизно 30 хвилин на торт, привітання іменинника, піньяту та настільні ігри.
