@@ -140,64 +140,64 @@ const DISCOUNT_AFTER_HOURS   = 2;
 const THIRD_HOUR_DISCOUNT    = 0.5;
 const SWITCH_MINUTES         = 18 * 60;
 
-  const gameDateEl = document.getElementById('gameDate');
-  const dayTypeBadgeEl = document.getElementById('dayTypeBadge');
-  const startEl = document.getElementById('start');
-  const endEl = document.getElementById('end');
-  const placesEl = document.getElementById('places');
-  const discountTypeEl = document.getElementById('discountType');
-  const adminNameEl = document.getElementById('adminName');
-  const clientNameEl = document.getElementById('clientName');
+const gameDateEl = document.getElementById('gameDate');
+const dayTypeBadgeEl = document.getElementById('dayTypeBadge');
+const startEl = document.getElementById('start');
+const endEl = document.getElementById('end');
+const placesEl = document.getElementById('places');
+const discountTypeEl = document.getElementById('discountType');
+const adminNameEl = document.getElementById('adminName');
+const clientNameEl = document.getElementById('clientName');
 
-  const totalPayEl = document.getElementById('totalPay');
-  const baseTotalEl = document.getElementById('baseTotal');
-  const discountValueEl = document.getElementById('discountValue');
-  const perPlaceEl = document.getElementById('perPlace');
-  const partsViewEl = document.getElementById('partsView');
+const totalPayEl = document.getElementById('totalPay');
+const baseTotalEl = document.getElementById('baseTotal');
+const discountValueEl = document.getElementById('discountValue');
+const perPlaceEl = document.getElementById('perPlace');
+const partsViewEl = document.getElementById('partsView');
 
-  const msgTypeEl = document.getElementById('msgType');
-  const msgRuEl = document.getElementById('msgRu');
-  const msgUaEl = document.getElementById('msgUa');
+const msgTypeEl = document.getElementById('msgType');
+const msgRuEl = document.getElementById('msgRu');
+const msgUaEl = document.getElementById('msgUa');
 
-  const today = new Date();
-  const yyyy = today.getFullYear();
-  const mm = String(today.getMonth() + 1).padStart(2, '0');
-  const dd = String(today.getDate()).padStart(2, '0');
-  gameDateEl.value = `${yyyy}-${mm}-${dd}`;
+const today = new Date();
+const yyyy = today.getFullYear();
+const mm = String(today.getMonth() + 1).padStart(2, '0');
+const dd = String(today.getDate()).padStart(2, '0');
+gameDateEl.value = `${yyyy}-${mm}-${dd}`;
 
-  function money(v) {
-    return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v) + ' грн';
-  }
+function money(v) {
+  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v) + ' грн';
+}
 
-  function toMinutes(str) {
-    const [h, m] = str.split(':').map(Number);
-    return h * 60 + m;
-  }
+function toMinutes(str) {
+  const [h, m] = str.split(':').map(Number);
+  return h * 60 + m;
+}
 
-  function fmtTime(min) {
-    const h = Math.floor(min / 60).toString().padStart(2, '0');
-    const m = Math.floor(min % 60).toString().padStart(2, '0');
-    return `${h}:${m}`;
-  }
+function fmtTime(min) {
+  const h = Math.floor(min / 60).toString().padStart(2, '0');
+  const m = Math.floor(min % 60).toString().padStart(2, '0');
+  return `${h}:${m}`;
+}
 
-  function getDayType() {
-    if (!gameDateEl.value) return { isWeekday: true, label: 'Дата не выбрана', short: 'weekday' };
-    const d = new Date(gameDateEl.value + 'T12:00:00');
-    const day = d.getDay();
-    const isWeekday = day >= 1 && day <= 5;
-    return {
-      isWeekday,
-      label: isWeekday ? 'Будний день' : 'Выходной/праздник',
-      short: isWeekday ? 'weekday' : 'weekend'
-    };
-  }
+function getDayType() {
+  if (!gameDateEl.value) return { isWeekday: true, label: 'Дата не выбрана', short: 'weekday' };
+  const d = new Date(gameDateEl.value + 'T12:00:00');
+  const day = d.getDay();
+  const isWeekday = day >= 1 && day <= 5;
+  return {
+    isWeekday,
+    label: isWeekday ? 'Будний день' : 'Выходной/праздник',
+    short: isWeekday ? 'weekday' : 'weekend'
+  };
+}
+
 function buildSegments(start, end, isWeekday) {
   const out = [];
   let current = start;
   let played = 0;
 
   while (current < end) {
-    // если выходной/праздник — НЕ режем по 18:00, берём сразу до конца
     const boundary = !isWeekday
       ? end
       : (current < SWITCH_MINUTES ? Math.min(end, SWITCH_MINUTES) : end);
@@ -211,11 +211,9 @@ function buildSegments(start, end, isWeekday) {
     let period;
 
     if (!isWeekday) {
-      // выходной/праздник — весь день 350
       rate = RATE_WEEKEND;
       period = 'weekend';
     } else {
-      // будни: до 18:00 — 300, после — 350
       if (current < SWITCH_MINUTES) {
         rate = RATE_WEEKDAY_BEFORE_18;
         period = 'before';
@@ -242,46 +240,47 @@ function buildSegments(start, end, isWeekday) {
   return out;
 }
 
-  function calculateDiscount(perPlace, baseTotal, places, discountType, isWeekday, before18Normal, before18Disc) {
-    if (discountType === 'birthday') {
-      return {
-        title: 'Скидка имениннику',
-        amount: perPlace,
-        note: 'Скидка применена только на одного игрока.'
-      };
-    }
-
-    if (discountType === 'zsu') {
-      return {
-        title: 'Скидка ЗСУ 30%',
-        amount: baseTotal * 0.3,
-        note: 'Скидка 30% применена ко всему заказу.'
-      };
-    }
-
-    if (discountType === 'student') {
-      const eligiblePerPlace = before18Normal + before18Disc;
-      if (!isWeekday || eligiblePerPlace <= 0) {
-        return {
-          title: 'Скидка студенту 30%',
-          amount: 0,
-          note: 'Студенческая скидка не действует: нужен будний день и игровое время до 18:00.'
-        };
-      }
-      const eligible = eligiblePerPlace * places;
-      return {
-        title: 'Скидка студенту 30%',
-        amount: eligible * 0.3,
-        note: 'Студенческая скидка применена только к части времени до 18:00 в будний день.'
-      };
-    }
-
+function calculateDiscount(perPlace, baseTotal, places, discountType, isWeekday, before18Normal, before18Disc) {
+  if (discountType === 'birthday') {
     return {
-      title: 'Без скидки',
-      amount: 0,
-      note: 'Скидка не выбрана.'
+      title: 'Скидка имениннику',
+      amount: perPlace,
+      note: 'Скидка применена только на одного игрока.'
     };
   }
+
+  if (discountType === 'zsu') {
+    return {
+      title: 'Скидка ЗСУ 30%',
+      amount: baseTotal * 0.3,
+      note: 'Скидка 30% применена ко всему заказу.'
+    };
+  }
+
+  if (discountType === 'student') {
+    const eligiblePerPlace = before18Normal + before18Disc;
+    if (!isWeekday || eligiblePerPlace <= 0) {
+      return {
+        title: 'Скидка студенту 30%',
+        amount: 0,
+        note: 'Студенческая скидка не действует: нужен будний день и игровое время до 18:00.'
+      };
+    }
+    const eligible = eligiblePerPlace * places;
+    return {
+      title: 'Скидка студенту 30%',
+      amount: eligible * 0.3,
+      note: 'Студенческая скидка применена только к части времени до 18:00 в будний день.'
+    };
+  }
+
+  return {
+    title: 'Без скидки',
+    amount: 0,
+    note: 'Скидка не выбрана.'
+  };
+}
+
 function calc() {
   const places = Math.max(1, Number(placesEl.value || 1));
   const start = toMinutes(startEl.value);
@@ -321,7 +320,10 @@ function calc() {
       before18Normal += normalCost;
       before18Disc += discountedCost;
     }
-    const periodTitle = seg.period === 'before' ? 'до 18:00' : 'после 18:00';
+    const periodTitle =
+      seg.period === 'before' ? 'до 18:00' :
+      seg.period === 'after'  ? 'после 18:00' :
+      'выходной/праздник';
     if (seg.normalHours > 0) {
       lines.push(
         `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}): ${seg.normalHours
@@ -398,39 +400,39 @@ function calc() {
   return result;
 }
 
-  function formatDateUaRu(dateStr) {
-    if (!dateStr) return { ru: '', ua: '' };
-    const [y, m, d] = dateStr.split('-');
-    const pretty = `${d}.${m}.${y}`;
-    return { ru: pretty, ua: pretty };
-  }
+function formatDateUaRu(dateStr) {
+  if (!dateStr) return { ru: '', ua: '' };
+  const [y, m, d] = dateStr.split('-');
+  const pretty = `${d}.${m}.${y}`;
+  return { ru: pretty, ua: pretty };
+}
 
-  function generateMessages(ctx) {
-    const d = formatDateUaRu(ctx.date);
-    const DATE_RU = d.ru;
-    const DATE_UA = d.ua;
-    const TIME_FROM = ctx.timeFrom;
-    const TIME_TO = ctx.timeTo;
-    const PLAYERS = ctx.players;
-    const PRICE = Math.round(ctx.price);
-    const ADMIN = ctx.admin || 'администратор';
-    const CLIENT_NAME = ctx.client || 'гость';
+function generateMessages(ctx) {
+  const d = formatDateUaRu(ctx.date);
+  const DATE_RU = d.ru;
+  const DATE_UA = d.ua;
+  const TIME_FROM = ctx.timeFrom;
+  const TIME_TO = ctx.timeTo;
+  const PLAYERS = ctx.players;
+  const PRICE = Math.round(ctx.price);
+  const ADMIN = ctx.admin || 'администратор';
+  const CLIENT_NAME = ctx.client || 'гость';
 
-    const totalHours = (toMinutes(TIME_TO) - toMinutes(TIME_FROM)) / 60;
-    const HOUR_PRICE = totalHours > 0 ? Math.round(ctx.baseTotal / (totalHours * PLAYERS) || 0) : 0;
-    const HOURS = totalHours.toFixed(1).replace('.', ',');
-    const CONSOLES = PLAYERS;
-    const BASE_TOTAL = Math.round(ctx.baseTotal);
-    const DISCOUNT_TOTAL = Math.round(ctx.finalTotal || ctx.baseTotal);
-    const DEPOSIT = Math.round((ctx.finalTotal || ctx.baseTotal) * 0.5);
+  const totalHours = (toMinutes(TIME_TO) - toMinutes(TIME_FROM)) / 60;
+  const HOUR_PRICE = totalHours > 0 ? Math.round(ctx.baseTotal / (totalHours * PLAYERS) || 0) : 0;
+  const HOURS = totalHours.toFixed(1).replace('.', ',');
+  const CONSOLES = PLAYERS;
+  const BASE_TOTAL = Math.round(ctx.baseTotal);
+  const DISCOUNT_TOTAL = Math.round(ctx.finalTotal || ctx.baseTotal);
+  const DEPOSIT = Math.round((ctx.finalTotal || ctx.baseTotal) * 0.5);
 
-    const msgType = msgTypeEl.value;
+  const msgType = msgTypeEl.value;
 
-    let ru = '';
-    let ua = '';
+  let ru = '';
+  let ua = '';
 
-    if (msgType === 'weekday') {
-      ru = `Здравствуйте, ${CLIENT_NAME} 👋
+  if (msgType === 'weekday') {
+    ru = `Здравствуйте, ${CLIENT_NAME} 👋
 
 Вы забронировали игровое время в клубе MirVR на:
 
@@ -453,7 +455,7 @@ function calc() {
 📍 Европейская, 89 (Екатерининская)
 🌐 https://mirvr.com.ua`;
 
-      ua = `Вітаємо, ${CLIENT_NAME} 👋
+    ua = `Вітаємо, ${CLIENT_NAME} 👋
 
 Ви забронювали ігровий час у клубі MirVR на:
 
@@ -475,8 +477,8 @@ function calc() {
 📞 093 942 34 70
 📍 Європейська, 89 (Катерининська)
 🌐 https://mirvr.com.ua`;
-    } else if (msgType === 'weekend') {
-      ru = `Здравствуйте, ${CLIENT_NAME} 👋
+  } else if (msgType === 'weekend') {
+    ru = `Здравствуйте, ${CLIENT_NAME} 👋
 
 Вы забронировали игровое время в клубе MirVR на:
 
@@ -507,7 +509,7 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
 📍 Европейская, 89 (Екатерининская)
 🌐 https://mirvr.com.ua`;
 
-      ua = `Вітаємо, ${CLIENT_NAME} 👋
+    ua = `Вітаємо, ${CLIENT_NAME} 👋
 
 Ви забронювали ігровий час у клубі MirVR на:
 
@@ -537,8 +539,8 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
 📞 093 942 34 70
 📍 Європейська, 89 (Катерининська)
 🌐 https://mirvr.com.ua`;
-    } else if (msgType === 'birthday') {
-  ru = `Здравствуйте, ${CLIENT_NAME}! ☀️
+  } else if (msgType === 'birthday') {
+    ru = `Здравствуйте, ${CLIENT_NAME}! ☀️
 
 Клуб виртуальной реальности MirVR рад предложить вам организацию Дня рождения.
 
@@ -615,7 +617,7 @@ ${ctx.detail}
 📍 Европейская, 89 (Екатерининская)
 🌐 https://mirvr.com.ua/birthday`;
 
-  ua = `Вітаємо, ${CLIENT_NAME}! ☀️
+    ua = `Вітаємо, ${CLIENT_NAME}! ☀️
 
 Клуб віртуальної реальності MirVR радий запропонувати Вам організацію 🥳 Дня народження 🥳
 
@@ -687,37 +689,45 @@ ${ctx.detail}
 📞 093 942 34 70
 📍 Європейська, 89 (Катерининська)
 🌐 https://mirvr.com.ua/birthday`;
-}
-
-    msgRuEl.value = ru;
-    msgUaEl.value = ua;
   }
 
-  document.getElementById('calcBtn').addEventListener('click', calc);
-  [gameDateEl, startEl, endEl, placesEl, discountTypeEl, msgTypeEl, adminNameEl, clientNameEl]
-    .forEach(el => el.addEventListener('input', calc));
+  msgRuEl.value = ru;
+  msgUaEl.value = ua;
+}
 
-  document.getElementById('copyMsgBtn').addEventListener('click', async () => {
-    try {
-      const txt = `${msgRuEl.value}
+document.getElementById('calcBtn').addEventListener('click', calc);
+[
+  gameDateEl,
+  startEl,
+  endEl,
+  placesEl,
+  discountTypeEl,
+  msgTypeEl,
+  adminNameEl,
+  clientNameEl
+].forEach(el => el.addEventListener('input', calc));
+
+document.getElementById('copyMsgBtn').addEventListener('click', async () => {
+  try {
+    const txt = `${msgRuEl.value}
 
 ---
 
 ${msgUaEl.value}`;
-      await navigator.clipboard.writeText(txt);
-      const btn = document.getElementById('copyMsgBtn');
-      const prev = btn.textContent;
-      btn.textContent = 'Скопировано';
-      setTimeout(() => btn.textContent = prev, 1200);
-    } catch (e) {}
-  });
+    await navigator.clipboard.writeText(txt);
+    const btn = document.getElementById('copyMsgBtn');
+    const prev = btn.textContent;
+    btn.textContent = 'Скопировано';
+    setTimeout(() => (btn.textContent = prev), 1200);
+  } catch (e) {}
+});
 
-  document.getElementById('themeBtn').addEventListener('click', () => {
-    const root = document.documentElement;
-    root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
-  });
+document.getElementById('themeBtn').addEventListener('click', () => {
+  const root = document.documentElement;
+  root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+});
 
-  calc();
+calc();
 </script>
 </body>
 </html>
