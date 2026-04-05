@@ -338,38 +338,36 @@ function calc() {
   const extraLines = [];
 
   // Специальный сценарий для Дня рождения: 0:00–0:30 банкет, 0:30–2:00 игры, 2:00–2:30 торт, 2:30–4:00 игры
-  if (msgType === 'birthday') {
-    const totalMinutes = end - start;
-    // Ожидаем 4 часа (240 минут); если другое — считаем всё как обычное бронирование
-    if (totalMinutes >= 239) {
-      const banquet1Start = start;
-      const banquet1End   = start + 30;          // 0:30
-      const game1Start    = banquet1End;
-      const game1End      = game1Start + 90;     // 2:00
-      const banquet2Start = game1End;
-      const banquet2End   = banquet2Start + 30;  // 2:30
-      const game2Start    = banquet2End;
-      const game2End      = end;                 // до конца
+if (msgType === 'birthday') {
+  // Всегда считаем: 30 мин банкет, 1.5 ч игры, 30 мин торт, 1.5 ч игры
+  const banquet1Start = start;
+  const banquet1End   = start + 30;          // +0:30
+  const game1Start    = banquet1End;
+  const game1End      = game1Start + 90;     // +1:30
+  const banquet2Start = game1End;
+  const banquet2End   = banquet2Start + 30;  // +0:30
+  const game2Start    = banquet2End;
+  const game2End      = game2Start + 90;     // +1:30
 
-      // Банкетные блоки — только в тексте, не в расчёте
-      extraLines.push(
-        `${fmtTime(banquet1Start)}–${fmtTime(banquet1End)} банкет — 30 минут`,
-        `${fmtTime(banquet2Start)}–${fmtTime(banquet2End)} торжественная часть / торт — 30 минут`
-      );
+  // Если общее окно меньше, чем нужно — обрезаем в пределах end
+  const safeGame1End = Math.min(game1End, end);
+  const safeGame2End = Math.min(game2End, end);
 
-      // Считаем только игровые блоки (2×1.5 часа)
-      segments = [
-        ...buildSegments(game1Start, game1End, dayType.isWeekday),
-        ...buildSegments(game2Start, game2End, dayType.isWeekday)
-      ];
-    } else {
-      // если поставили не 4 часа — считаем всё время как обычную бронь
-      segments = buildSegments(start, end, dayType.isWeekday);
-    }
-  } else {
-    // Обычные брони
-    segments = buildSegments(start, end, dayType.isWeekday);
+  extraLines.push(
+    `${fmtTime(banquet1Start)}–${fmtTime(banquet1End)} банкет — 30 минут`,
+    `${fmtTime(banquet2Start)}–${fmtTime(banquet2End)} торжественная часть / торт — 30 минут`
+  );
+
+  segments = [];
+  if (game1Start < safeGame1End) {
+    segments.push(...buildSegments(game1Start, safeGame1End, dayType.isWeekday));
   }
+  if (game2Start < safeGame2End) {
+    segments.push(...buildSegments(game2Start, safeGame2End, dayType.isWeekday));
+  }
+} else {
+  segments = buildSegments(start, end, dayType.isWeekday);
+}
 
   let perPlace       = 0;
   let before18Normal = 0;
