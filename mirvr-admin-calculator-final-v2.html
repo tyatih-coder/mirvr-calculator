@@ -256,112 +256,121 @@
       note: 'Скидка не выбрана.'
     };
   }
+function calc() {
+  const places = Math.max(1, Number(placesEl.value || 1));
+  const start = toMinutes(startEl.value);
+  const end = toMinutes(endEl.value);
+  const discountType = discountTypeEl.value;
+  const dayType = getDayType();
+  dayTypeBadgeEl.textContent = dayType.label;
 
-  function calc() {
-    const places = Math.max(1, Number(placesEl.value || 1));
-    const start = toMinutes(startEl.value);
-    const end = toMinutes(endEl.value);
-    const discountType = discountTypeEl.value;
-    const dayType = getDayType();
-    dayTypeBadgeEl.textContent = dayType.label;
-
-    if (end <= start) {
-      totalPayEl.textContent = 'Ошибка';
-      baseTotalEl.textContent = '—';
-      discountValueEl.textContent = '—';
-      perPlaceEl.textContent = '—';
-      partsViewEl.textContent = 'Время конца должно быть позже времени начала.';
-      msgRuEl.value = 'Исправьте время начала и конца.';
-      msgUaEl.value = 'Виправте час початку та завершення.';
-      return {
-        baseTotal: 0,
-        finalTotal: 0,
-        perPlace: 0,
-        discount: { amount: 0, title: '', note: '' }
-      };
-    }
-
-    const segments = buildSegments(start, end);
-    let perPlace = 0;
-    let before18Normal = 0;
-    let before18Disc = 0;
-    const lines = [];
-
-    segments.forEach(seg => {
-      const normalCost = seg.normalHours * seg.rate;
-      const discountedCost = seg.discountedHours * seg.rate * (1 - THIRD_HOUR_DISCOUNT);
-      perPlace += normalCost + discountedCost;
-      if (seg.period === 'before') {
-        before18Normal += normalCost;
-        before18Disc += discountedCost;
-      }
-      const periodTitle = seg.period === 'before' ? 'до 18:00' : 'после 18:00';
-      if (seg.normalHours > 0) {
-        lines.push(
-          `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}): ${seg.normalHours
-            .toFixed(2)
-            .replace('.', ',')} ч × ${seg.rate} = ${money(normalCost)} за 1 место`
-        );
-      }
-      if (seg.discountedHours > 0) {
-        lines.push(
-          `${fmtTime(seg.start)}–${fmtTime(seg.end)} скидочная часть: ${seg.discountedHours
-            .toFixed(2)
-            .replace('.', ',')} ч × ${seg.rate} × 50% = ${money(discountedCost)} за 1 место`
-        );
-      }
-    });
-
-    const baseTotal = perPlace * places;
-    const discount = calculateDiscount(
-      perPlace,
-      baseTotal,
-      places,
-      discountType,
-      dayType.isWeekday,
-      before18Normal,
-      before18Disc
-    );
-    const finalTotal = Math.max(0, baseTotal - discount.amount);
-
-    totalPayEl.textContent = money(finalTotal);
-    baseTotalEl.textContent = money(baseTotal);
-    discountValueEl.textContent = money(discount.amount);
-    perPlaceEl.textContent = money(perPlace);
-
-    const detail = [
-      `Имя клиента: ${clientNameEl.value || 'не указано'}`,
-      `Дата: ${gameDateEl.value || 'не выбрана'}`,
-      `Тип дня: ${dayType.label}`,
-      `Игровые места: ${places}`,
-      `Время: ${startEl.value}–${endEl.value}`,
-      '',
-      ...lines,
-      '',
-      `Итого за 1 место: ${money(perPlace)}`,
-      `Базовая сумма: ${money(baseTotal)}`,
-      `${discount.title}: ${money(discount.amount)}`,
-      `${discount.note}`,
-      `Итого к оплате: ${money(finalTotal)}`
-    ].join('\n');
-    partsViewEl.textContent = detail;
-
-    generateMessages({
-      date: gameDateEl.value,
-      timeFrom: startEl.value,
-      timeTo: endEl.value,
-      players: places,
-      price: finalTotal,
-      admin: adminNameEl.value || 'администратор',
-      client: clientNameEl.value || 'гость',
-      baseTotal,
-      perPlace,
-      finalTotal,
-      dayType: dayType.short
-    });
-
-    return { baseTotal, finalTotal, perPlace, discount };
+  if (end <= start) {
+    totalPayEl.textContent = 'Ошибка';
+    baseTotalEl.textContent = '—';
+    discountValueEl.textContent = '—';
+    perPlaceEl.textContent = '—';
+    partsViewEl.textContent = 'Время конца должно быть позже времени начала.';
+    msgRuEl.value = 'Исправьте время начала и конца.';
+    msgUaEl.value = 'Виправте час початку та завершення.';
+    return {
+      baseTotal: 0,
+      finalTotal: 0,
+      perPlace: 0,
+      discount: { amount: 0, title: '', note: '' },
+      detail: ''
+    };
   }
+
+  const segments = buildSegments(start, end);
+  let perPlace = 0;
+  let before18Normal = 0;
+  let before18Disc = 0;
+  const lines = [];
+
+  segments.forEach(seg => {
+    const normalCost = seg.normalHours * seg.rate;
+    const discountedCost = seg.discountedHours * seg.rate * (1 - THIRD_HOUR_DISCOUNT);
+    perPlace += normalCost + discountedCost;
+    if (seg.period === 'before') {
+      before18Normal += normalCost;
+      before18Disc += discountedCost;
+    }
+    const periodTitle = seg.period === 'before' ? 'до 18:00' : 'после 18:00';
+    if (seg.normalHours > 0) {
+      lines.push(
+        `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}): ${seg.normalHours
+          .toFixed(2)
+          .replace('.', ',')} ч × ${seg.rate} = ${money(normalCost)} за 1 место`
+      );
+    }
+    if (seg.discountedHours > 0) {
+      lines.push(
+        `${fmtTime(seg.start)}–${fmtTime(seg.end)} скидочная часть: ${seg.discountedHours
+          .toFixed(2)
+          .replace('.', ',')} ч × ${seg.rate} × 50% = ${money(discountedCost)} за 1 место`
+      );
+    }
+  });
+
+  const baseTotal = perPlace * places;
+  const discount = calculateDiscount(
+    perPlace,
+    baseTotal,
+    places,
+    discountType,
+    dayType.isWeekday,
+    before18Normal,
+    before18Disc
+  );
+  const finalTotal = Math.max(0, baseTotal - discount.amount);
+
+  totalPayEl.textContent = money(finalTotal);
+  baseTotalEl.textContent = money(baseTotal);
+  discountValueEl.textContent = money(discount.amount);
+  perPlaceEl.textContent = money(perPlace);
+
+  const detail = [
+    `Имя клиента: ${clientNameEl.value || 'не указано'}`,
+    `Дата: ${gameDateEl.value || 'не выбрана'}`,
+    `Тип дня: ${dayType.label}`,
+    `Игровые места: ${places}`,
+    `Время: ${startEl.value}–${endEl.value}`,
+    '',
+    ...lines,
+    '',
+    `Итого за 1 место: ${money(perPlace)}`,
+    `Базовая сумма: ${money(baseTotal)}`,
+    `${discount.title}: ${money(discount.amount)}`,
+    `${discount.note}`,
+    `Итого к оплате: ${money(finalTotal)}`
+  ].join('\n');
+  partsViewEl.textContent = detail;
+
+  const result = {
+    baseTotal,
+    finalTotal,
+    perPlace,
+    discount,
+    detail
+  };
+
+  generateMessages({
+    date: gameDateEl.value,
+    timeFrom: startEl.value,
+    timeTo: endEl.value,
+    players: places,
+    price: finalTotal,
+    admin: adminNameEl.value || 'администратор',
+    client: clientNameEl.value || 'гость',
+    baseTotal,
+    perPlace,
+    finalTotal,
+    dayType: dayType.short,
+    detail
+  });
+
+  return result;
+}
 
   function formatDateUaRu(dateStr) {
     if (!dateStr) return { ru: '', ua: '' };
@@ -503,7 +512,7 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
 📍 Європейська, 89 (Катерининська)
 🌐 https://mirvr.com.ua`;
     } else if (msgType === 'birthday') {
-      ru = `Вітаємо, ${CLIENT_NAME}! ☀️ (RU версия ниже — адаптирована)
+  ru = `Здравствуйте, ${CLIENT_NAME}! ☀️
 
 Клуб виртуальной реальности MirVR рад предложить вам организацию Дня рождения.
 
@@ -519,7 +528,7 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
 После игр — около 30 минут на торт, поздравления именинника, пиньяту и настольные игры. Этого достаточно, чтобы всем было весело и никто не успел заскучать.
 
 4️⃣ Индивидуальность
-Если вы хотите, чтобы во время праздника в клубе не было других посетителей, потрібно забронювати всі ігрові консолі (полная аренда). В противном случае в клубе могут быть и другие гости.
+Если вы хотите, чтобы во время праздника в клубе не было других посетителей, нужно забронировать все игровые консоли (полная аренда). В противном случае в клубе могут быть и другие гости.
 
 5️⃣ Заказ еды
 Вы можете заказать еду самостоятельно по нашему адресу или отправить нам скрин выбранных блюд — мы всё оформим за вас, чтобы вам не пришлось тратить время на звонки с курьером.
@@ -549,7 +558,7 @@ PlayStation (до 4 игроков):
 При предварительном бронировании дарим скидку 50% на все игровые места с третьего часа.
 
 8️⃣ Форс-мажор
-Если меняется количество гостей, желательно предупредить минимум за 4 дня до праздника, чтобы мы пересчитали бронь. Если гостей пришло меньше или произошёл форс-мажор, невикористана сума або аванс зараховуються на персональний рахунок в клубі. Использовать эти средства может один человек в течение 6 месяцев.
+Если меняется количество гостей, желательно предупредить минимум за 4 дня до праздника, чтобы мы пересчитали бронь. Если гостей пришло меньше или произошёл форс-мажор, неиспользованная сумма или аванс зачисляются на персональный счёт в клубе. Использовать эти средства может один человек в течение 6 месяцев.
 
 9️⃣ Расчёт и тайминг под ваш запрос
 Дата: ${DATE_UA}
@@ -562,13 +571,15 @@ PlayStation (до 4 игроков):
 Пожалуйста, приходите не раньше согласованного времени — до этого в клубе может проходить другое мероприятие.
 
 💰 Расчёт:
-${HOUR_PRICE} грн/час * ${CONSOLES} консолей * ${HOURS} часа = ${BASE_TOTAL} грн.
-Со скидкой за 3-й час: ${DISCOUNT_TOTAL} грн + 50 грн/чел за квесты (по желанию на месте).
+${ctx.detail}
+
+С учётом скидки за 3-й час: ${DISCOUNT_TOTAL} грн
+Дополнительно: +50 грн/чел за квесты (по желанию на месте).
 
 🔟 Аванс
 Для бронирования необходимо внести аванс — ${DEPOSIT} грн (50%). Чем раньше, тем лучше, так как места могут быть заняты другими клиентами. Оплатить можно в клубе или по ссылке (отправим отдельно).
 
-❗️Аванс не возвращается, но гарантирует броннирование игровых мест❗️
+❗️Аванс не возвращается, но гарантирует бронирование игровых мест❗️
 
 Отзывы: https://g.page/r/CS-kLQe9DbDjEBM
 
@@ -578,7 +589,7 @@ ${HOUR_PRICE} грн/час * ${CONSOLES} консолей * ${HOURS} часа =
 📍 Европейская, 89 (Екатерининская)
 🌐 https://mirvr.com.ua/birthday`;
 
-      ua = `Вітаємо, ${CLIENT_NAME}! ☀️
+  ua = `Вітаємо, ${CLIENT_NAME}! ☀️
 
 Клуб віртуальної реальності MirVR радий запропонувати Вам організацію 🥳 Дня народження 🥳
 
@@ -631,11 +642,12 @@ https://smilefood.od.ua
 9️⃣ Розрахунок та таймінг за Вашим запитом
 ${DATE_UA}
 Точний таймінг узгоджуємо індивідуально (збір гостей, ігри, торт, завершення).
-Будь ласка, приходьте не раніше узгодженого часу, оскільки до цього в клубі може проходити інший захід.
 
 💰 Розрахунок:
-${HOUR_PRICE} грн/год * ${CONSOLES} консолей * ${HOURS} години = ${BASE_TOTAL} грн.
-Зі знижкою за 3-ю годину: ${DISCOUNT_TOTAL} грн + 50 грн/особа за квести.
+${ctx.detail}
+
+З урахуванням знижки за 3-ю годину: ${DISCOUNT_TOTAL} грн
+Додатково: +50 грн/особа за квести (за бажанням на місці).
 
 🔟 Аванс
 Для бронювання необхідно внести аванс — ${DEPOSIT} грн (50%). Чим раніше, тим краще, оскільки місця можуть бути зайняті іншими клієнтами. Оплатити можна в клубі або за посиланням (відправимо окремо).
@@ -649,7 +661,7 @@ ${HOUR_PRICE} грн/год * ${CONSOLES} консолей * ${HOURS} годин
 📞 093 942 34 70
 📍 Європейська, 89 (Катерининська)
 🌐 https://mirvr.com.ua/birthday`;
-    }
+}
 
     msgRuEl.value = ru;
     msgUaEl.value = ua;
