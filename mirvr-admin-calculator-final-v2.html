@@ -192,13 +192,20 @@ const SWITCH_MINUTES         = 18 * 60;
     };
   }
 
-  function buildSegments(start, end, isWeekday) {
+  Нужно поменять только buildSegments — сейчас в нём выходной день всё равно режется по 18:00. Вставь эту версию вместо текущей функции.
+
+js
+function buildSegments(start, end, isWeekday) {
   const out = [];
   let current = start;
   let played = 0;
 
   while (current < end) {
-    const boundary = current < SWITCH_MINUTES ? Math.min(end, SWITCH_MINUTES) : end;
+    // если выходной/праздник — НЕ режем по 18:00, берём сразу до конца
+    const boundary = !isWeekday
+      ? end
+      : (current < SWITCH_MINUTES ? Math.min(end, SWITCH_MINUTES) : end);
+
     const durationHours = (boundary - current) / 60;
     const discountEligible = Math.max(0, (played + durationHours) - DISCOUNT_AFTER_HOURS);
     const discountedHours = Math.min(durationHours, discountEligible);
@@ -208,7 +215,7 @@ const SWITCH_MINUTES         = 18 * 60;
     let period;
 
     if (!isWeekday) {
-      // вых/праздник — весь день 350
+      // выходной/праздник — весь день 350
       rate = RATE_WEEKEND;
       period = 'weekend';
     } else {
