@@ -80,12 +80,13 @@
               <div id="dayTypeBadge" style="padding:10px 14px;border-radius:999px;border:1px solid var(--border);background:var(--panel-2);font-size:.9rem;font-weight:700">—</div>
             </div>
             <div>
-              <label for="start">Начало игры</label>
+              <label for="start">Начало праздника</label>
               <input id="start" type="time" value="17:30" />
+              <div class="hint">Админ ставит всё окно: от прихода гостей до конца торта.</div>
             </div>
             <div>
-              <label for="end">Конец игры</label>
-              <input id="end" type="time" value="20:30" />
+              <label for="end">Конец праздника</label>
+              <input id="end" type="time" value="21:30" />
             </div>
             <div>
               <label for="places">Количество игровых мест</label>
@@ -160,8 +161,8 @@
 const RATE_WEEKDAY_BEFORE_18 = 300;
 const RATE_WEEKDAY_AFTER_18  = 350;
 const RATE_WEEKEND           = 350;
-const DISCOUNT_AFTER_HOURS   = 2;   // после 2-го часа идёт скидка
-const THIRD_HOUR_DISCOUNT    = 0.5; // 50%
+const DISCOUNT_START_HOUR    = 3;    // с какого часа начинается скидка
+const DISCOUNT_PERCENT       = 0.5;  // 50%
 const SWITCH_MINUTES         = 18 * 60;
 
 const gameDateEl      = document.getElementById('gameDate');
@@ -216,61 +217,76 @@ function getDayType() {
   };
 }
 
-// Делим интервал на сегменты, учитывая будни/выходные и 18:00
-function buildSegments(start, end, isWeekday) {
+// Делим интервал на куски по тарифам (будни до/после 18:00 или выходной 350)
+function splitByTariff(start, end, isWeekday) {
   const out = [];
   let current = start;
-  let played  = 0;
-
   while (current < end) {
-    const boundary = !isWeekday
-      ? end
-      : (current < SWITCH_MINUTES ? Math.min(end, SWITCH_MINUTES) : end);
-
-    const durationHours    = (boundary - current) / 60;
-    const discountEligible = Math.max(0, (played + durationHours) - DISCOUNT_AFTER_HOURS);
-    const discountedHours  = Math.min(durationHours, discountEligible);
-    const normalHours      = durationHours - discountedHours;
-
-    let rate;
-    let period;
-
+    let rate, period, boundary;
     if (!isWeekday) {
-      rate   = RATE_WEEKEND;
+      rate = RATE_WEEKEND;
       period = 'weekend';
+      boundary = end;
     } else {
       if (current < SWITCH_MINUTES) {
-        rate   = RATE_WEEKDAY_BEFORE_18;
+        rate = RATE_WEEKDAY_BEFORE_18;
         period = 'before';
+        boundary = Math.min(end, SWITCH_MINUTES);
       } else {
-        rate   = RATE_WEEKDAY_AFTER_18;
+        rate = RATE_WEEKDAY_AFTER_18;
         period = 'after';
+        boundary = end;
       }
     }
-
     out.push({
       start: current,
       end: boundary,
-      period,
       rate,
-      durationHours,
-      normalHours,
-      discountedHours
+      period,
+      hours: (boundary - current) / 60
     });
-
-    played  += durationHours;
-    current  = boundary;
+    current = boundary;
   }
-
   return out;
 }
 
-// Дополнительные скидки (именинник, ЗСУ, студент)
-function calculateDiscount(perPlace, baseTotal, places, discountType, isWeekday, before18Normal, before18Disc) {
+// Наполняем часами, помечая обычные / со скидкой по номеру часа
+function applyHourDiscount(segments) {
+  let totalHours = 0;
+  const detailed = [];
+
+  for (const seg of segments) {
+    let remaining = seg.hours;
+    let cursor    = seg.start;
+
+    while (remaining > 0) {
+      const thisChunk = Math.min(1 - (totalHours % 1 || 0), remaining); // режем максимум по 1 часу, но учитывая дробь
+      const hourIndex = Math.floor(totalHours) + 1; // 1-й, 2-й, 3-й...
+
+      const discounted = hourIndex >= DISCOUNT_START_HOUR;
+      detailed.push({
+        start: cursor,
+        end: cursor + thisChunk * 60,
+        rate: seg.rate,
+        period: seg.period,
+        hours: thisChunk,
+        discounted
+      });
+
+      totalHours += thisChunk;
+      remaining  -= thisChunk;
+      cursor     += thisChunk * 60;
+    }
+  }
+  return detailed;
+}
+
+// Дополнительные (именинник, ЗСУ, студент)
+function calculateExtraDiscount(perPlaceBase, baseTotal, places, discountType, isWeekday, before18PerPlace) {
   if (discountType === 'birthday') {
     return {
       title: 'Скидка имениннику',
-      amount: perPlace,
+      amount: perPlaceBase,
       note: 'Скидка применена только на одного игрока.'
     };
   }
@@ -284,15 +300,14 @@ function calculateDiscount(perPlace, baseTotal, places, discountType, isWeekday,
   }
 
   if (discountType === 'student') {
-    const eligiblePerPlace = before18Normal + before18Disc;
-    if (!isWeekday || eligiblePerPlace <= 0) {
+    if (!isWeekday || before18PerPlace <= 0) {
       return {
         title: 'Скидка студенту 30%',
         amount: 0,
         note: 'Студенческая скидка не действует: нужен будний день и игровое время до 18:00.'
       };
     }
-    const eligible = eligiblePerPlace * places;
+    const eligible = before18PerPlace * places;
     return {
       title: 'Скидка студенту 30%',
       amount: eligible * 0.3,
@@ -303,7 +318,7 @@ function calculateDiscount(perPlace, baseTotal, places, discountType, isWeekday,
   return {
     title: 'Без дополнительных скидок',
     amount: 0,
-    note: 'Применена только стандартная скидка 50% с 3-го часа.'
+    note: 'Применена только скидка 50% с 3-го часа.'
   };
 }
 
@@ -332,56 +347,65 @@ function calc() {
     };
   }
 
-  const msgType = msgTypeEl.value;
-
-  let segments = [];
+  const msgType    = msgTypeEl.value;
   const extraLines = [];
+  let segmentsBase = [];
 
-  // Специальный сценарий для Дня рождения: 0:00–0:30 банкет, 0:30–2:00 игры, 2:00–2:30 торт, 2:30–4:00 игры
-if (msgType === 'birthday') {
-  // Всегда считаем: 30 мин банкет, 1.5 ч игры, 30 мин торт, 1.5 ч игры
-  const banquet1Start = start;
-  const banquet1End   = start + 30;          // +0:30
-  const game1Start    = banquet1End;
-  const game1End      = game1Start + 90;     // +1:30
-  const banquet2Start = game1End;
-  const banquet2End   = banquet2Start + 30;  // +0:30
-  const game2Start    = banquet2End;
-  const game2End      = game2Start + 90;     // +1:30
+  if (msgType === 'birthday') {
+    const totalMinutes = end - start;
+    if (totalMinutes < 240) {
+      partsViewEl.textContent = 'Для сценария Дня рождения нужно минимум 4 часа между началом и концом праздника.';
+      totalPayEl.textContent      = 'Ошибка';
+      baseTotalEl.textContent     = '—';
+      discountValueEl.textContent = '—';
+      perPlaceEl.textContent      = '—';
+      return {
+        baseTotal: 0,
+        finalTotal: 0,
+        perPlace: 0,
+        discount: { amount: 0, title: '', note: '' },
+        detail: ''
+      };
+    }
 
-  // Если общее окно меньше, чем нужно — обрезаем в пределах end
-  const safeGame1End = Math.min(game1End, end);
-  const safeGame2End = Math.min(game2End, end);
+    const banquet1Start = start;
+    const banquet1End   = start + 30;
+    const game1Start    = banquet1End;
+    const game1End      = game1Start + 90;     // +1,5 часа игр
+    const banquet2Start = game1End;
+    const banquet2End   = banquet2Start + 30;
+    const game2Start    = banquet2End;
+    const game2End      = game2Start + 90;     // ещё 1,5 часа игр
 
-  extraLines.push(
-    `${fmtTime(banquet1Start)}–${fmtTime(banquet1End)} банкет — 30 минут`,
-    `${fmtTime(banquet2Start)}–${fmtTime(banquet2End)} торжественная часть / торт — 30 минут`
-  );
+    extraLines.push(
+      `${fmtTime(banquet1Start)}–${fmtTime(banquet1End)} банкет — 30 минут`,
+      `${fmtTime(banquet2Start)}–${fmtTime(banquet2End)} торжественная часть / торт — 30 минут`
+    );
 
-  segments = [];
-  if (game1Start < safeGame1End) {
-    segments.push(...buildSegments(game1Start, safeGame1End, dayType.isWeekday));
+    segmentsBase = [
+      ...splitByTariff(game1Start, game1End, dayType.isWeekday),
+      ...splitByTariff(game2Start, game2End, dayType.isWeekday)
+    ];
+  } else {
+    segmentsBase = splitByTariff(start, end, dayType.isWeekday);
   }
-  if (game2Start < safeGame2End) {
-    segments.push(...buildSegments(game2Start, safeGame2End, dayType.isWeekday));
-  }
-} else {
-  segments = buildSegments(start, end, dayType.isWeekday);
-}
 
-  let perPlace       = 0;
-  let before18Normal = 0;
-  let before18Disc   = 0;
-  const lines        = [];
+  const segments = applyHourDiscount(segmentsBase);
+
+  let perPlaceBase         = 0;
+  let perPlaceDiscountPart = 0;
+  let before18PerPlace     = 0;
+  const lines              = [];
+  const discountLines      = [];
 
   segments.forEach(seg => {
-    const normalCost     = seg.normalHours * seg.rate;
-    const discountedCost = seg.discountedHours * seg.rate * (1 - THIRD_HOUR_DISCOUNT);
-    perPlace += normalCost + discountedCost;
+    const fullCost  = seg.hours * seg.rate;
+    const costPart  = seg.discounted ? fullCost * (1 - DISCOUNT_PERCENT) : fullCost;
+    perPlaceBase   += fullCost;
+    perPlaceDiscountPart += fullCost - costPart;
 
     if (seg.period === 'before') {
-      before18Normal += normalCost;
-      before18Disc   += discountedCost;
+      before18PerPlace += fullCost;
     }
 
     const periodTitle =
@@ -389,47 +413,36 @@ if (msgType === 'birthday') {
       seg.period === 'after'  ? 'после 18:00' :
       'выходной/праздник';
 
-    if (seg.normalHours > 0) {
+    if (!seg.discounted) {
       lines.push(
-        `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}): ${seg.normalHours
+        `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}): ${seg.hours
           .toFixed(2)
-          .replace('.', ',')} ч × ${seg.rate} = ${money(normalCost)} за 1 место`
+          .replace('.', ',')} ч × ${seg.rate} = ${money(fullCost)} за 1 место`
       );
-    }
-
-    if (seg.discountedHours > 0) {
-      lines.push(
-        `Скидка за ${DISCOUNT_AFTER_HOURS + 1}-й и последующие часы: ${seg.discountedHours
+    } else {
+      discountLines.push(
+        `Скидка за ${seg.hours
           .toFixed(2)
-          .replace('.', ',')} ч × ${seg.rate} × 50% = ${money(discountedCost)} за 1 место`
+          .replace('.', ',')} ч (начиная с ${DISCOUNT_START_HOUR}-го часа игр) по ${seg.rate}: −${money(fullCost * DISCOUNT_PERCENT)} за 1 место`
+      );
+      lines.push(
+        `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}) со скидкой 50%: ${seg.hours
+          .toFixed(2)
+          .replace('.', ',')} ч × ${seg.rate} × 50% = ${money(costPart)} за 1 место`
       );
     }
   });
 
-  const baseTotal = perPlace * places;
-  const discount  = calculateDiscount(
-    perPlace,
-    baseTotal,
-    places,
-    discountType,
-    dayType.isWeekday,
-    before18Normal,
-    before18Disc
-  );
-  const finalTotal = Math.max(0, baseTotal - discount.amount);
+  const perPlace   = perPlaceBase - perPlaceDiscountPart;
+  const baseTotal  = perPlace * places;
+  const extraDisc  = calculateExtraDiscount(perPlaceBase, baseTotal, places, discountType, dayType.isWeekday, before18PerPlace);
+  const finalTotal = Math.max(0, baseTotal - extraDisc.amount);
+  const totalDisc  = perPlaceDiscountPart * places + extraDisc.amount;
 
   totalPayEl.textContent      = money(finalTotal);
   baseTotalEl.textContent     = money(baseTotal);
-  discountValueEl.textContent = money(discount.amount);
+  discountValueEl.textContent = money(totalDisc);
   perPlaceEl.textContent      = money(perPlace);
-
-  const hasExtraDiscount = discountType !== 'none';
-
-  const discountTitleLine = hasExtraDiscount
-    ? `${discount.title}: ${money(discount.amount)}`
-    : 'Дополнительные скидки не применялись. Скидка 50% с 3-го часа уже учтена.';
-
-  const discountNoteLine = hasExtraDiscount ? discount.note : '';
 
   const detail = [
     `Имя клиента: ${clientNameEl.value || 'не указано'}`,
@@ -445,10 +458,14 @@ if (msgType === 'birthday') {
     '',
     ...lines,
     '',
+    ...(discountLines.length ? discountLines : []),
+    '',
     `Итого за 1 место: ${money(perPlace)}`,
     `Базовая сумма: ${money(baseTotal)}`,
-    discountTitleLine,
-    discountNoteLine,
+    extraDisc.title === 'Без дополнительных скидок'
+      ? `Дополнительные скидки не применялись. Скидка 50% с ${DISCOUNT_START_HOUR}-го часа уже учтена.`
+      : `${extraDisc.title}: ${money(extraDisc.amount)}`,
+    extraDisc.note,
     `Итого к оплате: ${money(finalTotal)}`
   ].join('\n');
 
@@ -458,7 +475,7 @@ if (msgType === 'birthday') {
     baseTotal,
     finalTotal,
     perPlace,
-    discount,
+    discount: { amount: totalDisc, title: extraDisc.title, note: extraDisc.note },
     detail
   };
 
@@ -498,18 +515,13 @@ function generateMessages(ctx) {
   const ADMIN     = ctx.admin || 'администратор';
   const CLIENT_NAME = ctx.client || 'гость';
 
-  const totalHours     = (toMinutes(TIME_TO) - toMinutes(TIME_FROM)) / 60;
-  const HOUR_PRICE     = totalHours > 0 ? Math.round(ctx.baseTotal / (totalHours * PLAYERS) || 0) : 0;
-  const BASE_TOTAL     = Math.round(ctx.baseTotal);
-  const DISCOUNT_TOTAL = Math.round(ctx.finalTotal || ctx.baseTotal);
-  const DEPOSIT        = Math.round((ctx.finalTotal || ctx.baseTotal) * 0.5);
+  const DEPOSIT = Math.round((ctx.finalTotal || ctx.baseTotal) * 0.5);
 
   const msgType = msgTypeEl.value;
 
   let ru = '';
   let ua = '';
 
-  // Обычная бронь (будни)
   if (msgType === 'weekday') {
     ru = `Здравствуйте, ${CLIENT_NAME} 👋
 
@@ -556,10 +568,7 @@ function generateMessages(ctx) {
 📞 093 942 34 70
 📍 Європейська, 89 (Катерининська)
 🌐 https://mirvr.com.ua`;
-  }
-
-  // Обычная бронь (выходной)
-  else if (msgType === 'weekend') {
+  } else if (msgType === 'weekend') {
     ru = `Здравствуйте, ${CLIENT_NAME} 👋
 
 Вы забронировали игровое время в клубе MirVR на:
@@ -621,11 +630,7 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
 📞 093 942 34 70
 📍 Європейська, 89 (Катерининська)
 🌐 https://mirvr.com.ua`;
-  }
-
-  // День рождения
-  else if (msgType === 'birthday') {
-    // RU
+  } else if (msgType === 'birthday') {
     ru = `Здравствуйте, ${CLIENT_NAME}! ☀️
 
 Клуб виртуальной реальности MirVR рад предложить вам организацию Дня рождения.
@@ -637,7 +642,7 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
 Ещё около 30 минут банкета может проходить после или внутри игрового времени — эти 60 минут не оплачиваются, но входят в общее время праздника.
 
 2️⃣ Игровое время
-Стандартное игровое время — 3 часа (1,5 часа игр + 30 минут торта + 1,5 часа игр). Можно забронировать и другие варианты, но в этом сценарии расчёт идёт именно за 3 часа игр.
+Стандартное игровое время — 3 часа (1,5 часа игр + 30 минут торта + 1,5 часа игр). Можно забронировать и другие варианты, при этом скидка 50% действует на каждый час, начиная с третьего часа игр.
 
 3️⃣ Торжественная часть
 После игр — около 30 минут на торт, поздравления именинника, пиньяту и настольные игры.
@@ -687,7 +692,6 @@ ${ctx.detail}
 📍 Европейская, 89 (Екатерининская)
 🌐 https://mirvr.com.ua/birthday`;
 
-    // UA
     ua = `Вітаємо, ${CLIENT_NAME}! ☀️
 
 Клуб віртуальної реальності MirVR радий запропонувати Вам організацію 🥳 Дня народження 🥳
@@ -699,7 +703,7 @@ ${ctx.detail}
 Ще близько 30 хвилин банкету може проходити після або всередині ігрового часу — ці 60 хвилин не оплачуються, але входять у загальний час свята.
 
 2️⃣ Ігровий час
-Стандартний ігровий час — 3 години (1,5 години ігор + 30 хвилин торта + 1,5 години ігор). У цьому сценарії оплачується саме 3 години ігор.
+Стандартний ігровий час — 3 години (1,5 години ігор + 30 хвилин торта + 1,5 години ігор). Можна забронювати й інші варіанти, при цьому знижка 50% діє на кожну годину, починаючи з третьої години ігор.
 
 3️⃣ Урочиста частина
 Після ігор — приблизно 30 хвилин на торт, привітання іменинника, піньяту та настільні ігри.
