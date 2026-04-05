@@ -191,10 +191,6 @@ const SWITCH_MINUTES         = 18 * 60;
       short: isWeekday ? 'weekday' : 'weekend'
     };
   }
-
-  Нужно поменять только buildSegments — сейчас в нём выходной день всё равно режется по 18:00. Вставь эту версию вместо текущей функции.
-
-js
 function buildSegments(start, end, isWeekday) {
   const out = [];
   let current = start;
