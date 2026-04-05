@@ -132,11 +132,11 @@
     </section>
   </div>
 
- <script>
+<script>
 const RATE_WEEKDAY_BEFORE_18 = 300;
 const RATE_WEEKDAY_AFTER_18  = 350;
 const RATE_WEEKEND           = 350;
-const DISCOUNT_AFTER_HOURS   = 2;   // с какого часа начинаем скидку (после 2-го)
+const DISCOUNT_AFTER_HOURS   = 2;   // после 2-го часа
 const THIRD_HOUR_DISCOUNT    = 0.5; // 50%
 const SWITCH_MINUTES         = 18 * 60;
 
@@ -192,7 +192,7 @@ function getDayType() {
   };
 }
 
-// разбиение интервала на сегменты с учётом будни/выходные и границы 18:00
+// делим интервал на сегменты, учитывая будни/выходные и 18:00
 function buildSegments(start, end, isWeekday) {
   const out = [];
   let current = start;
@@ -203,7 +203,7 @@ function buildSegments(start, end, isWeekday) {
       ? end
       : (current < SWITCH_MINUTES ? Math.min(end, SWITCH_MINUTES) : end);
 
-    const durationHours   = (boundary - current) / 60;
+    const durationHours    = (boundary - current) / 60;
     const discountEligible = Math.max(0, (played + durationHours) - DISCOUNT_AFTER_HOURS);
     const discountedHours  = Math.min(durationHours, discountEligible);
     const normalHours      = durationHours - discountedHours;
@@ -241,7 +241,7 @@ function buildSegments(start, end, isWeekday) {
   return out;
 }
 
-// дополнительные скидки по типу (именинник, ЗСУ, студент)
+// дополнительные скидки (именинник, ЗСУ, студент)
 function calculateDiscount(perPlace, baseTotal, places, discountType, isWeekday, before18Normal, before18Disc) {
   if (discountType === 'birthday') {
     return {
@@ -309,10 +309,10 @@ function calc() {
   }
 
   const segments = buildSegments(start, end, dayType.isWeekday);
-  let perPlace        = 0;
-  let before18Normal  = 0;
-  let before18Disc    = 0;
-  const lines         = [];
+  let perPlace       = 0;
+  let before18Normal = 0;
+  let before18Disc   = 0;
+  const lines        = [];
 
   segments.forEach(seg => {
     const normalCost     = seg.normalHours * seg.rate;
@@ -435,13 +435,13 @@ function generateMessages(ctx) {
   const ADMIN     = ctx.admin || 'администратор';
   const CLIENT_NAME = ctx.client || 'гость';
 
-  const totalHours   = (toMinutes(TIME_TO) - toMinutes(TIME_FROM)) / 60;
-  const HOUR_PRICE   = totalHours > 0 ? Math.round(ctx.baseTotal / (totalHours * PLAYERS) || 0) : 0;
-  const HOURS        = totalHours.toFixed(1).replace('.', ',');
-  const CONSOLES     = PLAYERS;
-  const BASE_TOTAL   = Math.round(ctx.baseTotal);
+  const totalHours     = (toMinutes(TIME_TO) - toMinutes(TIME_FROM)) / 60;
+  const HOUR_PRICE     = totalHours > 0 ? Math.round(ctx.baseTotal / (totalHours * PLAYERS) || 0) : 0;
+  const HOURS          = totalHours.toFixed(1).replace('.', ',');
+  const CONSOLES       = PLAYERS;
+  const BASE_TOTAL     = Math.round(ctx.baseTotal);
   const DISCOUNT_TOTAL = Math.round(ctx.finalTotal || ctx.baseTotal);
-  const DEPOSIT      = Math.round((ctx.finalTotal || ctx.baseTotal) * 0.5);
+  const DEPOSIT        = Math.round((ctx.finalTotal || ctx.baseTotal) * 0.5);
 
   const msgType = msgTypeEl.value;
 
