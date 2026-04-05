@@ -216,7 +216,7 @@ function getDayType() {
   };
 }
 
-// Будни: режем по тарифам, выходной: просто 350
+// Делим интервал по тарифам
 function splitByTariff(start, end, isWeekday) {
   const out = [];
   let current = start;
@@ -249,7 +249,7 @@ function splitByTariff(start, end, isWeekday) {
   return out;
 }
 
-// Для будней: помечаем, какие куски попадают после 3-го часа игр
+// Для общих бронирований/будних ДР: помечаем, какие части идут со скидкой
 function applyHourDiscount(segments) {
   let totalHours = 0;
   const detailed = [];
@@ -385,113 +385,166 @@ function calc() {
       { start: banquet2Start, end: banquet2End, text: `${fmtTime(banquet2Start)}–${fmtTime(banquet2End)} торжественная часть / торт — 30 минут` }
     );
 
-    // Если выходной/праздник — считаем просто: 3 часа по 350, с 3-го часа 50% скидка
     if (!dayType.isWeekday) {
-      // первый блок: 1,5 часа игр без скидки
+      // Выходной: один тариф 350, считаем блоками 1,5 часа
       const firstBlockHours = 1.5;
-      const firstBlockCost  = firstBlockHours * RATE_WEEKEND;
+      const firstBlockCostPerPlace = firstBlockHours * RATE_WEEKEND;
+      const firstBlockCostTotal    = firstBlockCostPerPlace * places;
+
       timeline.push({
         start: game1Start,
         end: game1End,
-        text: `${fmtTime(game1Start)}–${fmtTime(game1End)} (выходной/праздник): ${firstBlockHours.toFixed(2).replace('.', ',')} ч × ${RATE_WEEKEND} = ${money(firstBlockCost)} за 1 место`
+        text: `${fmtTime(game1Start)}–${fmtTime(game1End)} (выходной/праздник): ${firstBlockHours
+          .toFixed(2)
+          .replace('.', ',')} ч × ${RATE_WEEKEND} × ${places} игроков = ${money(firstBlockCostTotal)} всего`
       });
 
-      // второй блок: 1,5 часа, из них 0,5 часа без скидки, 1 час со скидкой
-      const secondBlockFirstPartHours = 0.5;
+      // Второй блок: 1,5 часа (0,5 без скидки, 1 час со скидкой)
+      const secondBlockFirstPartHours  = 0.5;
       const secondBlockSecondPartHours = 1.0;
 
       const secondPartStart = game2Start + secondBlockFirstPartHours * 60;
       const secondPartEnd   = game2End;
 
-      const costFirstPart  = secondBlockFirstPartHours * RATE_WEEKEND;
-      const costSecondFull = secondBlockSecondPartHours * RATE_WEEKEND;
-      const discountSecond = costSecondFull * DISCOUNT_PERCENT;
-      const costSecondPart = costSecondFull - discountSecond;
+      const costFirstPartPerPlace  = secondBlockFirstPartHours * RATE_WEEKEND;
+      const costFirstPartTotal     = costFirstPartPerPlace * places;
+
+      const costSecondFullPerPlace = secondBlockSecondPartHours * RATE_WEEKEND;
+      const discountSecondPerPlace = costSecondFullPerPlace * DISCOUNT_PERCENT;
+      const costSecondPartPerPlace = costSecondFullPerPlace - discountSecondPerPlace;
+      const costSecondPartTotal    = costSecondPartPerPlace * places;
 
       timeline.push({
         start: game2Start,
         end: secondPartStart,
-        text: `${fmtTime(game2Start)}–${fmtTime(secondPartStart)} (выходной/праздник): ${secondBlockFirstPartHours.toFixed(2).replace('.', ',')} ч × ${RATE_WEEKEND} = ${money(costFirstPart)} за 1 место`
+        text: `${fmtTime(game2Start)}–${fmtTime(secondPartStart)} (выходной/праздник): ${secondBlockFirstPartHours
+          .toFixed(2)
+          .replace('.', ',')} ч × ${RATE_WEEKEND} × ${places} игроков = ${money(costFirstPartTotal)} всего`
       });
 
       timeline.push({
         start: secondPartStart,
         end: secondPartEnd,
-        text: `${fmtTime(secondPartStart)}–${fmtTime(secondPartEnd)} (выходной/праздник) со скидкой 50%: ${secondBlockSecondPartHours.toFixed(2).replace('.', ',')} ч × ${RATE_WEEKEND} × 50% = ${money(costSecondPart)} за 1 место`
+        text: `${fmtTime(secondPartStart)}–${fmtTime(secondPartEnd)} (выходной/праздник) со скидкой 50%: ${secondBlockSecondPartHours
+          .toFixed(2)
+          .replace('.', ',')} ч × ${RATE_WEEKEND} × 50% × ${places} игроков = ${money(costSecondPartTotal)} всего`
       });
 
       discountLines.push(
-        `Скидка за ${secondBlockSecondPartHours.toFixed(2).replace('.', ',')} ч (начиная с ${DISCOUNT_START_HOUR}-го часа игр) по ${RATE_WEEKEND}: −${money(discountSecond)} за 1 место`
+        `Скидка за ${secondBlockSecondPartHours
+          .toFixed(2)
+          .replace('.', ',')} ч (начиная с ${DISCOUNT_START_HOUR}-го часа игр) по ${RATE_WEEKEND} × ${places} игроков: −${money(discountSecondPerPlace * places)}`
       );
 
-      perPlaceBase         = firstBlockCost + costFirstPart + costSecondFull;
-      perPlaceDiscountPart = discountSecond;
+      perPlaceBase         = firstBlockCostPerPlace + costFirstPartPerPlace + costSecondFullPerPlace;
+      perPlaceDiscountPart = discountSecondPerPlace;
     } else {
-      // Будний ДР — используем общий механизм с почасовым разрезанием и скидкой
-      const segmentsBase = [
-        ...splitByTariff(game1Start, game1End, dayType.isWeekday),
-        ...splitByTariff(game2Start, game2End, dayType.isWeekday)
+      // Будний ДР: режем по тарифам и часам, упрощая вывод, если тариф не меняется
+      const blocks = [
+        { start: game1Start, end: game1End, label: '1,5 часа игр' },
+        { start: game2Start, end: game2End, label: '1,5 часа игр (второй блок)' }
       ];
-      const segments = applyHourDiscount(segmentsBase);
 
-      segments.forEach(seg => {
-        const fullCost  = seg.hours * seg.rate;
-        const costPart  = seg.discounted ? fullCost * (1 - DISCOUNT_PERCENT) : fullCost;
-        perPlaceBase   += fullCost;
-        perPlaceDiscountPart += fullCost - costPart;
+      let totalHoursSoFar = 0;
 
-        if (seg.period === 'before') {
-          before18PerPlace += fullCost;
-        }
+      for (const block of blocks) {
+        const segmentsBase = splitByTariff(block.start, block.end, dayType.isWeekday);
 
-        const periodTitle =
-          seg.period === 'before' ? 'до 18:00' :
-          seg.period === 'after'  ? 'после 18:00' :
-          'выходной/праздник';
+        const uniqueRates = Array.from(new Set(segmentsBase.map(s => s.rate)));
+        const sameRate = uniqueRates.length === 1;
 
-        if (!seg.discounted) {
+        if (sameRate && totalHoursSoFar < 2) {
+          // Весь блок по одному тарифу, и мы ещё не зашли в 3-й час
+          const blockHours = (block.end - block.start) / 60;
+          const fullCostPerPlace = blockHours * uniqueRates[0];
+          const fullCostTotal    = fullCostPerPlace * places;
+
+          perPlaceBase += fullCostPerPlace;
+          if (segmentsBase[0].period === 'before') {
+            before18PerPlace += fullCostPerPlace;
+          }
+
           timeline.push({
-            start: seg.start,
-            end: seg.end,
-            text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}): ${seg.hours
+            start: block.start,
+            end: block.end,
+            text: `${fmtTime(block.start)}–${fmtTime(block.end)} (будний, один тариф): ${blockHours
               .toFixed(2)
-              .replace('.', ',')} ч × ${seg.rate} = ${money(fullCost)} за 1 место`
+              .replace('.', ',')} ч × ${uniqueRates[0]} × ${places} игроков = ${money(fullCostTotal)} всего`
           });
+
+          totalHoursSoFar += blockHours;
         } else {
-          discountLines.push(
-            `Скидка за ${seg.hours
-              .toFixed(2)
-              .replace('.', ',')} ч (начиная с ${DISCOUNT_START_HOUR}-го часа игр) по ${seg.rate}: −${money(fullCost * DISCOUNT_PERCENT)} за 1 место`
-          );
-          timeline.push({
-            start: seg.start,
-            end: seg.end,
-            text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}) со скидкой 50%: ${seg.hours
-              .toFixed(2)
-              .replace('.', ',')} ч × ${seg.rate} × 50% = ${money(costPart)} за 1 место`
+          // В блоке есть смена тарифа, либо мы уже зашли в 3-й час — используем почасовую скидку
+          const segments = applyHourDiscount(segmentsBase);
+
+          segments.forEach(seg => {
+            const fullCostPerPlace = seg.hours * seg.rate;
+            const costPartPerPlace = seg.discounted ? fullCostPerPlace * (1 - DISCOUNT_PERCENT) : fullCostPerPlace;
+            const fullCostTotal    = fullCostPerPlace * places;
+            const costPartTotal    = costPartPerPlace * places;
+
+            perPlaceBase         += fullCostPerPlace;
+            perPlaceDiscountPart += fullCostPerPlace - costPartPerPlace;
+
+            if (seg.period === 'before') {
+              before18PerPlace += fullCostPerPlace;
+            }
+
+            const periodTitle =
+              seg.period === 'before' ? 'будний до 18:00' :
+              seg.period === 'after'  ? 'будний после 18:00' :
+              'выходной/праздник';
+
+            if (!seg.discounted) {
+              timeline.push({
+                start: seg.start,
+                end: seg.end,
+                text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}): ${seg.hours
+                  .toFixed(2)
+                  .replace('.', ',')} ч × ${seg.rate} × ${places} игроков = ${money(costPartTotal)} всего`
+              });
+            } else {
+              const discountTotal = fullCostTotal * DISCOUNT_PERCENT;
+              discountLines.push(
+                `Скидка за ${seg.hours
+                  .toFixed(2)
+                  .replace('.', ',')} ч (начиная с ${DISCOUNT_START_HOUR}-го часа игр) по ${seg.rate} × ${places} игроков: −${money(discountTotal)}`
+              );
+              timeline.push({
+                start: seg.start,
+                end: seg.end,
+                text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}) со скидкой 50%: ${seg.hours
+                  .toFixed(2)
+                  .replace('.', ',')} ч × ${seg.rate} × 50% × ${places} игроков = ${money(costPartTotal)} всего`
+              });
+            }
+
+            totalHoursSoFar += seg.hours;
           });
         }
-      });
+      }
     }
   } else {
     // Обычные брони
     const segmentsBase = splitByTariff(start, end, dayType.isWeekday);
-    // Для обычных броней: тоже применяем скидку с 3-го часа
     const segments = applyHourDiscount(segmentsBase);
 
     segments.forEach(seg => {
-      const fullCost  = seg.hours * seg.rate;
-      const costPart  = seg.discounted ? fullCost * (1 - DISCOUNT_PERCENT) : fullCost;
-      perPlaceBase   += fullCost;
-      perPlaceDiscountPart += fullCost - costPart;
+      const fullCostPerPlace = seg.hours * seg.rate;
+      const costPartPerPlace = seg.discounted ? fullCostPerPlace * (1 - DISCOUNT_PERCENT) : fullCostPerPlace;
+      const fullCostTotal    = fullCostPerPlace * places;
+      const costPartTotal    = costPartPerPlace * places;
+
+      perPlaceBase         += fullCostPerPlace;
+      perPlaceDiscountPart += fullCostPerPlace - costPartPerPlace;
 
       if (seg.period === 'before') {
-        before18PerPlace += fullCost;
+        before18PerPlace += fullCostPerPlace;
       }
 
       const periodTitle =
-        seg.period === 'before' ? 'до 18:00' :
-        seg.period === 'after'  ? 'после 18:00' :
+        seg.period === 'before' ? 'будний до 18:00' :
+        seg.period === 'after'  ? 'будний после 18:00' :
         'выходной/праздник';
 
       if (!seg.discounted) {
@@ -500,20 +553,21 @@ function calc() {
           end: seg.end,
           text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}): ${seg.hours
             .toFixed(2)
-            .replace('.', ',')} ч × ${seg.rate} = ${money(fullCost)} за 1 место`
+            .replace('.', ',')} ч × ${seg.rate} × ${places} игроков = ${money(costPartTotal)} всего`
         });
       } else {
+        const discountTotal = fullCostTotal * DISCOUNT_PERCENT;
         discountLines.push(
           `Скидка за ${seg.hours
             .toFixed(2)
-            .replace('.', ',')} ч (начиная с ${DISCOUNT_START_HOUR}-го часа игр) по ${seg.rate}: −${money(fullCost * DISCOUNT_PERCENT)} за 1 место`
+            .replace('.', ',')} ч (начиная с ${DISCOUNT_START_HOUR}-го часа игр) по ${seg.rate} × ${places} игроков: −${money(discountTotal)}`
         );
         timeline.push({
           start: seg.start,
           end: seg.end,
           text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}) со скидкой 50%: ${seg.hours
             .toFixed(2)
-            .replace('.', ',')} ч × ${seg.rate} × 50% = ${money(costPart)} за 1 место`
+            .replace('.', ',')} ч × ${seg.rate} × 50% × ${places} игроков = ${money(costPartTotal)} всего`
         });
       }
     });
