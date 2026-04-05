@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Калькулятор MirVR + тексты для клиентов</title>
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#f7f6f2; --panel:#fcfbf8; --panel-2:#f1efea; --border:#d8d4cb; --text:#28251d; --muted:#6e6a63; --primary:#01696f; --primary-2:#e0efee; --accent:#964219; --ok:#2f6b20; --danger:#a13544; --shadow:0 10px 30px rgba(20,20,20,.08); --r:18px; --r2:14px; }
+    [data-theme="dark"] { --bg:#171614; --panel:#1d1c1a; --panel-2:#252320; --border:#3a3733; --text:#e6e1d8; --muted:#aaa49a; --primary:#4f98a3; --primary-2:#23363a; --accent:#d8a176; --ok:#86c56a; --danger:#df7d8b; --shadow:0 16px 36px rgba(0,0,0,.35); }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:'Satoshi',Arial,sans-serif;background:linear-gradient(180deg,var(--bg),var(--panel-2));color:var(--text)}
+    .wrap{max-width:1240px;margin:0 auto;padding:24px}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px}
+    .brand{display:flex;align-items:center;gap:14px}
+    .logo{width:46px;height:46px;border-radius:14px;background:var(--primary);display:grid;place-items:center;color:#fff;box-shadow:var(--shadow)}
+    .top h1{font-size:clamp(1.5rem,1.1rem + 1.8vw,2.5rem);margin:0}
+    .top p{margin:4px 0 0;color:var(--muted)}
+    .theme{border:1px solid var(--border);background:var(--panel);padding:12px 14px;border-radius:999px;cursor:pointer;color:var(--text)}
+    .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:24px}
+    .card{background:color-mix(in srgb,var(--panel) 90%,transparent);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow)}
+    .inner{padding:24px}
+    .lead{margin:0 0 20px;color:var(--muted);max-width:70ch}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+    label{display:block;font-weight:700;margin-bottom:8px}
+    input,select,textarea{width:100%;padding:14px 15px;border-radius:var(--r2);border:1px solid var(--border);background:var(--panel);color:var(--text);outline:none;font-family:inherit}
+    input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 18%,transparent)}
+    .actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px}
+    .btn{min-height:44px;padding:10px 14px;border-radius:999px;border:none;cursor:pointer;font-weight:700}
+    .btn.primary{background:var(--primary);color:#fff}
+    .btn.secondary{background:var(--primary-2);color:var(--text);border:1px solid var(--border)}
+    .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px}
+    .stat,.box{padding:16px;border-radius:var(--r2);background:var(--panel);border:1px solid var(--border)}
+    .stat span{display:block;color:var(--muted);font-size:.95rem;margin-bottom:6px}
+    .stat strong{font-size:1.4rem}
+    .box h3{margin:0 0 10px;font-size:1rem}
+    .box pre{margin:0;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.55;font-size:.9rem}
+    .full{grid-column:1/-1}
+    @media (max-width:960px){.hero{grid-template-columns:1fr}.grid,.stats{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">
+        <div class="logo">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M4 6.5L12 3L20 6.5V17.5L12 21L4 17.5V6.5Z" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M12 3V21M4 6.5L12 10L20 6.5" stroke="currentColor" stroke-width="1.8"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Калькулятор MirVR + тексты для клиентов</h1>
+          <p>Считает цену и формирует длинные и короткие сообщения (RU+UA) с именем клиента.</p>
+        </div>
+      </div>
+      <button class="theme" id="themeBtn">🌙 Тема</button>
+    </div>
+
+    <div class="hero">
+      <section class="card">
+        <div class="inner">
+          <p class="lead">Слева администратор считает стоимость и вводит данные бронирования. Справа выбирается тип сообщения: обычная бронь, выходной/праздник или День рождения (детальный сценарий).</p>
+          <div class="grid">
+            <div>
+              <label for="clientName">Имя клиента</label>
+              <input id="clientName" type="text" placeholder="Например, Оля" />
+            </div>
+            <div>
+              <label for="adminName">Имя администратора</label>
+              <input id="adminName" type="text" placeholder="Например, Яна" />
+            </div>
+            <div>
+              <label for="gameDate">Дата</label>
+              <input id="gameDate" type="date" />
+            </div>
+            <div>
+              <label>Тип дня</label>
+              <div id="dayTypeBadge" style="padding:10px 14px;border-radius:999px;border:1px solid var(--border);background:var(--panel-2);font-size:.9rem;font-weight:700">—</div>
+            </div>
+            <div>
+              <label for="start">Начало праздника</label>
+              <input id="start" type="time" value="17:30" />
+              <div class="lead" style="font-size:.85rem;margin-top:6px">Администратор ставит всё окно: от прихода гостей до конца торта.</div>
+            </div>
+            <div>
+              <label for="end">Конец праздника</label>
+              <input id="end" type="time" value="21:30" />
+            </div>
+            <div>
+              <label for="places">Количество игровых мест</label>
+              <input id="places" type="number" min="1" step="1" value="6" />
+            </div>
+            <div>
+              <label for="discountType">Скидка</label>
+              <select id="discountType">
+                <option value="none">Без скидки</option>
+                <option value="birthday">Именинник</option>
+                <option value="zsu">ЗСУ 30%</option>
+                <option value="student">Студент 30%</option>
+              </select>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn primary" id="calcBtn">Посчитать</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="inner">
+          <div class="stats">
+            <div class="stat"><span>Итог к оплате</span><strong id="totalPay">0 грн</strong></div>
+            <div class="stat"><span>Базовая сумма без скидки</span><strong id="baseTotal">0 грн</strong></div>
+            <div class="stat"><span>Размер скидки</span><strong id="discountValue">0 грн</strong></div>
+            <div class="stat"><span>Стоимость за 1 место</span><strong id="perPlace">0 грн</strong></div>
+          </div>
+          <div class="box" style="margin-bottom:14px">
+            <h3>Разбивка</h3>
+            <pre id="partsView"></pre>
+          </div>
+          <div class="box">
+            <h3>Тип сообщения</h3>
+            <div class="grid">
+              <div>
+                <label for="msgType">Выберите формат</label>
+                <select id="msgType">
+                  <option value="weekday">Обычная бронь (будний)</option>
+                  <option value="weekend">Обычная бронь (выходной/праздник, аванс 200 грн)</option>
+                  <option value="birthday">День рождения (детальный сценарий, аванс 50%)</option>
+                </select>
+              </div>
+              <div>
+                <label>&nbsp;</label>
+                <button class="btn secondary" id="copyMsgBtn">Скопировать RU+UA</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:24px">
+      <div class="inner">
+        <div class="grid">
+          <div class="full">
+            <h3>Сообщение для клиента (RU)</h3>
+            <textarea id="msgRu" rows="14" readonly></textarea>
+          </div>
+          <div class="full" style="margin-top:16px">
+            <h3>Повідомлення для клієнта (UA)</h3>
+            <textarea id="msgUa" rows="20" readonly></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+<script>
+const RATE_WEEKDAY_BEFORE_18 = 300;
+const RATE_WEEKDAY_AFTER_18  = 350;
+const RATE_WEEKEND           = 350;
+const DISCOUNT_START_HOUR    = 3;
+const DISCOUNT_PERCENT       = 0.5;
+const SWITCH_MINUTES         = 18 * 60;
+
+const gameDateEl      = document.getElementById('gameDate');
+const dayTypeBadgeEl  = document.getElementById('dayTypeBadge');
+const startEl         = document.getElementById('start');
+const endEl           = document.getElementById('end');
+const placesEl        = document.getElementById('places');
+const discountTypeEl  = document.getElementById('discountType');
+const adminNameEl     = document.getElementById('adminName');
+const clientNameEl    = document.getElementById('clientName');
+
+const totalPayEl      = document.getElementById('totalPay');
+const baseTotalEl     = document.getElementById('baseTotal');
+const discountValueEl = document.getElementById('discountValue');
+const perPlaceEl      = document.getElementById('perPlace');
+const partsViewEl     = document.getElementById('partsView');
+
+const msgTypeEl = document.getElementById('msgType');
+const msgRuEl   = document.getElementById('msgRu');
+const msgUaEl   = document.getElementById('msgUa');
+
+const today = new Date();
+const yyyy  = today.getFullYear();
+const mm    = String(today.getMonth() + 1).padStart(2, '0');
+const dd    = String(today.getDate()).padStart(2, '0');
+gameDateEl.value = `${yyyy}-${mm}-${dd}`;
+
+function money(v) {
+  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(v) + ' грн';
+}
+
+function toMinutes(str) {
+  const [h, m] = str.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function fmtTime(min) {
+  const h = Math.floor(min / 60).toString().padStart(2, '0');
+  const m = Math.floor(min % 60).toString().padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+function getDayType() {
+  if (!gameDateEl.value) return { isWeekday: true, label: 'Дата не выбрана', short: 'weekday' };
+  const d   = new Date(gameDateEl.value + 'T12:00:00');
+  const day = d.getDay();
+  const isWeekday = day >= 1 && day <= 5;
+  return {
+    isWeekday,
+    label: isWeekday ? 'Будний день' : 'Выходной/праздник',
+    short: isWeekday ? 'weekday' : 'weekend'
+  };
+}
+
+// Делим интервал по тарифам
+function splitByTariff(start, end, isWeekday) {
+  const out = [];
+  let current = start;
+  while (current < end) {
+    let rate, period, boundary;
+    if (!isWeekday) {
+      rate = RATE_WEEKEND;
+      period = 'weekend';
+      boundary = end;
+    } else {
+      if (current < SWITCH_MINUTES) {
+        rate = RATE_WEEKDAY_BEFORE_18;
+        period = 'before';
+        boundary = Math.min(end, SWITCH_MINUTES);
+      } else {
+        rate = RATE_WEEKDAY_AFTER_18;
+        period = 'after';
+        boundary = end;
+      }
+    }
+    out.push({
+      start: current,
+      end: boundary,
+      rate,
+      period,
+      hours: (boundary - current) / 60
+    });
+    current = boundary;
+  }
+  return out;
+}
+
+// Для общих бронирований/будних ДР: помечаем, какие части идут со скидкой
+function applyHourDiscount(segments) {
+  let totalHours = 0;
+  const detailed = [];
+
+  for (const seg of segments) {
+    let remaining = seg.hours;
+    let cursor    = seg.start;
+
+    while (remaining > 0) {
+      const fractionInCurrentHour = totalHours % 1;
+      const capacity = fractionInCurrentHour === 0 ? 1 : 1 - fractionInCurrentHour;
+      const thisChunk = Math.min(capacity, remaining);
+      const hourIndex = Math.floor(totalHours) + 1;
+
+      const discounted = hourIndex >= DISCOUNT_START_HOUR;
+      detailed.push({
+        start: cursor,
+        end: cursor + thisChunk * 60,
+        rate: seg.rate,
+        period: seg.period,
+        hours: thisChunk,
+        discounted
+      });
+
+      totalHours += thisChunk;
+      remaining  -= thisChunk;
+      cursor     += thisChunk * 60;
+    }
+  }
+  return detailed;
+}
+
+function calculateExtraDiscount(perPlaceBase, baseTotal, places, discountType, isWeekday, before18PerPlace) {
+  if (discountType === 'birthday') {
+    return {
+      title: 'Скидка имениннику',
+      amount: perPlaceBase,
+      note: 'Скидка применена только на одного игрока.'
+    };
+  }
+
+  if (discountType === 'zsu') {
+    return {
+      title: 'Скидка ЗСУ 30%',
+      amount: baseTotal * 0.3,
+      note: 'Скидка 30% применена ко всему заказу.'
+    };
+  }
+
+  if (discountType === 'student') {
+    if (!isWeekday || before18PerPlace <= 0) {
+      return {
+        title: 'Скидка студенту 30%',
+        amount: 0,
+        note: 'Студенческая скидка не действует: нужен будний день и игровое время до 18:00.'
+      };
+    }
+    const eligible = before18PerPlace * places;
+    return {
+      title: 'Скидка студенту 30%',
+      amount: eligible * 0.3,
+      note: 'Студенческая скидка применена только к части времени до 18:00 в будний день.'
+    };
+  }
+
+  return {
+    title: 'Без дополнительных скидок',
+    amount: 0,
+    note: 'Применена только скидка 50% с 3-го часа.'
+  };
+}
+
+function calc() {
+  const places       = Math.max(1, Number(placesEl.value || 1));
+  const start        = toMinutes(startEl.value);
+  const end          = toMinutes(endEl.value);
+  const discountType = discountTypeEl.value;
+  const dayType      = getDayType();
+  dayTypeBadgeEl.textContent = dayType.label;
+
+  if (end <= start) {
+    totalPayEl.textContent      = 'Ошибка';
+    baseTotalEl.textContent     = '—';
+    discountValueEl.textContent = '—';
+    perPlaceEl.textContent      = '—';
+    partsViewEl.textContent     = 'Время конца должно быть позже времени начала.';
+    msgRuEl.value = 'Исправьте время начала и конца.';
+    msgUaEl.value = 'Виправте час початку та завершення.';
+    return {
+      baseTotal: 0,
+      finalTotal: 0,
+      perPlace: 0,
+      discount: { amount: 0, title: '', note: '' },
+      detail: ''
+    };
+  }
+
+  const msgType    = msgTypeEl.value;
+  const timeline   = [];
+  const discountLines = [];
+  let perPlaceBase         = 0;
+  let perPlaceDiscountPart = 0;
+  let before18PerPlace     = 0;
+
+  if (msgType === 'birthday') {
+    const totalMinutes = end - start;
+    if (totalMinutes < 240) {
+      partsViewEl.textContent = 'Для сценария Дня рождения нужно минимум 4 часа между началом и концом праздника.';
+      totalPayEl.textContent      = 'Ошибка';
+      baseTotalEl.textContent     = '—';
+      discountValueEl.textContent = '—';
+      perPlaceEl.textContent      = '—';
+      return {
+        baseTotal: 0,
+        finalTotal: 0,
+        perPlace: 0,
+        discount: { amount: 0, title: '', note: '' },
+        detail: ''
+      };
+    }
+
+    const banquet1Start = start;
+    const banquet1End   = start + 30;
+    const game1Start    = banquet1End;
+    const game1End      = game1Start + 90;
+    const banquet2Start = game1End;
+    const banquet2End   = banquet2Start + 30;
+    const game2Start    = banquet2End;
+    const game2End      = game2Start + 90;
+
+    timeline.push(
+      { start: banquet1Start, end: banquet1End, text: `${fmtTime(banquet1Start)}–${fmtTime(banquet1End)} банкет — 30 минут` },
+      { start: banquet2Start, end: banquet2End, text: `${fmtTime(banquet2Start)}–${fmtTime(banquet2End)} торжественная часть / торт — 30 минут` }
+    );
+
+    if (!dayType.isWeekday) {
+      // Выходной: один тариф 350, считаем блоками 1,5 часа
+      const firstBlockHours = 1.5;
+      const firstBlockCostPerPlace = firstBlockHours * RATE_WEEKEND;
+      const firstBlockCostTotal    = firstBlockCostPerPlace * places;
+
+      timeline.push({
+        start: game1Start,
+        end: game1End,
+        text: `${fmtTime(game1Start)}–${fmtTime(game1End)} (выходной/праздник): ${firstBlockHours
+          .toFixed(2)
+          .replace('.', ',')} ч × ${RATE_WEEKEND} × ${places} игроков = ${money(firstBlockCostTotal)} всего`
+      });
+
+      // Второй блок: 1,5 часа (0,5 без скидки, 1 час со скидкой)
+      const secondBlockFirstPartHours  = 0.5;
+      const secondBlockSecondPartHours = 1.0;
+
+      const secondPartStart = game2Start + secondBlockFirstPartHours * 60;
+      const secondPartEnd   = game2End;
+
+      const costFirstPartPerPlace  = secondBlockFirstPartHours * RATE_WEEKEND;
+      const costFirstPartTotal     = costFirstPartPerPlace * places;
+
+      const costSecondFullPerPlace = secondBlockSecondPartHours * RATE_WEEKEND;
+      const discountSecondPerPlace = costSecondFullPerPlace * DISCOUNT_PERCENT;
+      const costSecondPartPerPlace = costSecondFullPerPlace - discountSecondPerPlace;
+      const costSecondPartTotal    = costSecondPartPerPlace * places;
+
+      timeline.push({
+        start: game2Start,
+        end: secondPartStart,
+        text: `${fmtTime(game2Start)}–${fmtTime(secondPartStart)} (выходной/праздник): ${secondBlockFirstPartHours
+          .toFixed(2)
+          .replace('.', ',')} ч × ${RATE_WEEKEND} × ${places} игроков = ${money(costFirstPartTotal)} всего`
+      });
+
+      timeline.push({
+        start: secondPartStart,
+        end: secondPartEnd,
+        text: `${fmtTime(secondPartStart)}–${fmtTime(secondPartEnd)} (выходной/праздник) со скидкой 50%: ${secondBlockSecondPartHours
+          .toFixed(2)
+          .replace('.', ',')} ч × ${RATE_WEEKEND} × 50% × ${places} игроков = ${money(costSecondPartTotal)} всего`
+      });
+
+      discountLines.push(
+        `Скидка за ${secondBlockSecondPartHours
+          .toFixed(2)
+          .replace('.', ',')} ч (начиная с ${DISCOUNT_START_HOUR}-го часа игр) по ${RATE_WEEKEND} × ${places} игроков: −${money(discountSecondPerPlace * places)}`
+      );
+
+      perPlaceBase         = firstBlockCostPerPlace + costFirstPartPerPlace + costSecondFullPerPlace;
+      perPlaceDiscountPart = discountSecondPerPlace;
+    } else {
+      // Будний ДР: режем по тарифам и часам, упрощая вывод, если тариф не меняется
+      const blocks = [
+        { start: game1Start, end: game1End, label: '1,5 часа игр' },
+        { start: game2Start, end: game2End, label: '1,5 часа игр (второй блок)' }
+      ];
+
+      let totalHoursSoFar = 0;
+
+      for (const block of blocks) {
+        const segmentsBase = splitByTariff(block.start, block.end, dayType.isWeekday);
+
+        const uniqueRates = Array.from(new Set(segmentsBase.map(s => s.rate)));
+        const sameRate = uniqueRates.length === 1;
+
+        if (sameRate && totalHoursSoFar < 2) {
+          // Весь блок по одному тарифу, и мы ещё не зашли в 3-й час
+          const blockHours = (block.end - block.start) / 60;
+          const fullCostPerPlace = blockHours * uniqueRates[0];
+          const fullCostTotal    = fullCostPerPlace * places;
+
+          perPlaceBase += fullCostPerPlace;
+          if (segmentsBase[0].period === 'before') {
+            before18PerPlace += fullCostPerPlace;
+          }
+
+          timeline.push({
+            start: block.start,
+            end: block.end,
+            text: `${fmtTime(block.start)}–${fmtTime(block.end)} (будний, один тариф): ${blockHours
+              .toFixed(2)
+              .replace('.', ',')} ч × ${uniqueRates[0]} × ${places} игроков = ${money(fullCostTotal)} всего`
+          });
+
+          totalHoursSoFar += blockHours;
+        } else {
+          // В блоке есть смена тарифа, либо мы уже зашли в 3-й час — используем почасовую скидку
+          const segments = applyHourDiscount(segmentsBase);
+
+          segments.forEach(seg => {
+            const fullCostPerPlace = seg.hours * seg.rate;
+            const costPartPerPlace = seg.discounted ? fullCostPerPlace * (1 - DISCOUNT_PERCENT) : fullCostPerPlace;
+            const fullCostTotal    = fullCostPerPlace * places;
+            const costPartTotal    = costPartPerPlace * places;
+
+            perPlaceBase         += fullCostPerPlace;
+            perPlaceDiscountPart += fullCostPerPlace - costPartPerPlace;
+
+            if (seg.period === 'before') {
+              before18PerPlace += fullCostPerPlace;
+            }
+
+            const periodTitle =
+              seg.period === 'before' ? 'будний до 18:00' :
+              seg.period === 'after'  ? 'будний после 18:00' :
+              'выходной/праздник';
+
+            if (!seg.discounted) {
+              timeline.push({
+                start: seg.start,
+                end: seg.end,
+                text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}): ${seg.hours
+                  .toFixed(2)
+                  .replace('.', ',')} ч × ${seg.rate} × ${places} игроков = ${money(costPartTotal)} всего`
+              });
+            } else {
+              const discountTotal = fullCostTotal * DISCOUNT_PERCENT;
+              discountLines.push(
+                `Скидка за ${seg.hours
+                  .toFixed(2)
+                  .replace('.', ',')} ч (начиная с ${DISCOUNT_START_HOUR}-го часа игр) по ${seg.rate} × ${places} игроков: −${money(discountTotal)}`
+              );
+              timeline.push({
+                start: seg.start,
+                end: seg.end,
+                text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}) со скидкой 50%: ${seg.hours
+                  .toFixed(2)
+                  .replace('.', ',')} ч × ${seg.rate} × 50% × ${places} игроков = ${money(costPartTotal)} всего`
+              });
+            }
+
+            totalHoursSoFar += seg.hours;
+          });
+        }
+      }
+    }
+  } else {
+    // Обычные брони
+    const segmentsBase = splitByTariff(start, end, dayType.isWeekday);
+    const segments = applyHourDiscount(segmentsBase);
+
+    segments.forEach(seg => {
+      const fullCostPerPlace = seg.hours * seg.rate;
+      const costPartPerPlace = seg.discounted ? fullCostPerPlace * (1 - DISCOUNT_PERCENT) : fullCostPerPlace;
+      const fullCostTotal    = fullCostPerPlace * places;
+      const costPartTotal    = costPartPerPlace * places;
+
+      perPlaceBase         += fullCostPerPlace;
+      perPlaceDiscountPart += fullCostPerPlace - costPartPerPlace;
+
+      if (seg.period === 'before') {
+        before18PerPlace += fullCostPerPlace;
+      }
+
+      const periodTitle =
+        seg.period === 'before' ? 'будний до 18:00' :
+        seg.period === 'after'  ? 'будний после 18:00' :
+        'выходной/праздник';
+
+      if (!seg.discounted) {
+        timeline.push({
+          start: seg.start,
+          end: seg.end,
+          text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}): ${seg.hours
+            .toFixed(2)
+            .replace('.', ',')} ч × ${seg.rate} × ${places} игроков = ${money(costPartTotal)} всего`
+        });
+      } else {
+        const discountTotal = fullCostTotal * DISCOUNT_PERCENT;
+        discountLines.push(
+          `Скидка за ${seg.hours
+            .toFixed(2)
+            .replace('.', ',')} ч (начиная с ${DISCOUNT_START_HOUR}-го часа игр) по ${seg.rate} × ${places} игроков: −${money(discountTotal)}`
+        );
+        timeline.push({
+          start: seg.start,
+          end: seg.end,
+          text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}) со скидкой 50%: ${seg.hours
+            .toFixed(2)
+            .replace('.', ',')} ч × ${seg.rate} × 50% × ${places} игроков = ${money(costPartTotal)} всего`
+        });
+      }
+    });
+  }
+
+  timeline.sort((a, b) => a.start - b.start);
+  const timelineText = timeline.map(t => t.text);
+
+  const perPlace   = perPlaceBase - perPlaceDiscountPart;
+  const baseTotal  = perPlace * places;
+  const extraDisc  = calculateExtraDiscount(perPlaceBase, baseTotal, places, discountType, dayType.isWeekday, before18PerPlace);
+  const finalTotal = Math.max(0, baseTotal - extraDisc.amount);
+  const totalDisc  = perPlaceDiscountPart * places + extraDisc.amount;
+
+  totalPayEl.textContent      = money(finalTotal);
+  baseTotalEl.textContent     = money(baseTotal);
+  discountValueEl.textContent = money(totalDisc);
+  perPlaceEl.textContent      = money(perPlace);
+
+  const detail = [
+    `Имя клиента: ${clientNameEl.value || 'не указано'}`,
+    `Дата: ${gameDateEl.value || 'не выбрана'}`,
+    `Тип дня: ${dayType.label}`,
+    `Игровые места: ${places}`,
+    `Время: ${startEl.value}–${endEl.value}`,
+    '',
+    ...timelineText,
+    '',
+    ...(discountLines.length ? discountLines : []),
+    '',
+    `Итого за 1 место: ${money(perPlace)}`,
+    `Базовая сумма: ${money(baseTotal)}`,
+    extraDisc.title === 'Без дополнительных скидок'
+      ? `Дополнительные скидки не применялись. Скидка 50% с ${DISCOUNT_START_HOUR}-го часа уже учтена.`
+      : `${extraDisc.title}: ${money(extraDisc.amount)}`,
+    `Итого к оплате: ${money(finalTotal)}`
+  ].join('\n');
+
+  partsViewEl.textContent = detail;
+
+  const result = {
+    baseTotal,
+    finalTotal,
+    perPlace,
+    discount: { amount: totalDisc, title: extraDisc.title, note: extraDisc.note },
+    detail
+  };
+
+  generateMessages({
+    date: gameDateEl.value,
+    timeFrom: startEl.value,
+    timeTo: endEl.value,
+    players: places,
+    price: finalTotal,
+    admin: adminNameEl.value || 'администратор',
+    client: clientNameEl.value || 'гость',
+    baseTotal,
+    perPlace,
+    finalTotal,
+    dayType: dayType.short,
+    detail
+  });
+
+  return result;
+}
+
+function formatDateUaRu(dateStr) {
+  if (!dateStr) return { ru: '', ua: '' };
+  const [y, m, d] = dateStr.split('-');
+  const pretty = `${d}.${m}.${y}`;
+  return { ru: pretty, ua: pretty };
+}
+
+function generateMessages(ctx) {
+  const d         = formatDateUaRu(ctx.date);
+  const DATE_RU   = d.ru;
+  const DATE_UA   = d.ua;
+  const TIME_FROM = ctx.timeFrom;
+  const TIME_TO   = ctx.timeTo;
+  const PLAYERS   = ctx.players;
+  const PRICE     = Math.round(ctx.price);
+  const ADMIN     = ctx.admin || 'администратор';
+  const CLIENT_NAME = ctx.client || 'гость';
+
+  const DEPOSIT = Math.round((ctx.finalTotal || ctx.baseTotal) * 0.5);
+
+  const msgType = msgTypeEl.value;
+
+  let ru = '';
+  let ua = '';
+
+  if (msgType === 'weekday') {
+    ru = `Здравствуйте, ${CLIENT_NAME} 👋
+
+Вы забронировали игровое время в клубе MirVR на:
+
+🔔 Дата: ${DATE_RU}
+⌛️ Время: ${TIME_FROM} – ${TIME_TO}
+🎮 Количество участников: ${PLAYERS}
+💰 Стоимость: ${PRICE} грн
+
++50 грн/час/чел доплата за квест, если вы выберете его на месте.
+
+Будем рады видеть вас за 5–10 минут до начала игрового времени.
+
+❗️ ВНИМАНИЕ ❗️
+* Если количество игроков уменьшится или сократится игровое время, оплата остаётся 100%, а остаток средств зачисляется на баланс игрового счёта.
+* Если игроки добавляются, пожалуйста, согласуйте это заранее, иначе может не быть свободных мест 😢
+
+С уважением, клуб виртуальной реальности MirVR, администратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Европейская, 89 (Екатерининская)
+🌐 https://mirvr.com.ua`;
+
+    ua = `Вітаємо, ${CLIENT_NAME} 👋
+
+Ви забронювали ігровий час у клубі MirVR на:
+
+🔔 Дата: ${DATE_UA}
+⌛️ Час: ${TIME_FROM} – ${TIME_TO}
+🎮 Кількість учасників: ${PLAYERS}
+💰 Вартість: ${PRICE} грн
+
++50 грн/год/люд доплата за квест, якщо ви оберете його на місці.
+
+Будемо раді бачити вас у гостях за 5–10 хвилин до початку ігрового часу.
+
+❗️ УВАГА ❗️
+* Якщо кількість гравців зменшиться або скоротиться ігровий час, оплата залишається 100%, а залишок коштів зараховується на баланс ігрового рахунку.
+* Якщо гравці додаються, погодьте, будь ласка, заздалегідь, інакше може не бути вільних місць 😢
+
+З повагою, клуб віртуальної реальності MirVR, адміністратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Європейська, 89 (Катеринінська)
+🌐 https://mirvr.com.ua`;
+  } else if (msgType === 'weekend') {
+    ru = `Здравствуйте, ${CLIENT_NAME} 👋
+
+Вы забронировали игровое время в клубе MirVR на:
+
+🔔 Дата: ${DATE_RU}
+⌛️ Время: ${TIME_FROM} – ${TIME_TO}
+🎮 Количество участников: ${PLAYERS}
+💰 Стоимость: ${PRICE} грн
+
++50 грн/час/чел доплата за квест, если вы выберете его на месте.
+
+Будем рады видеть вас за 5–10 минут до начала игрового времени.
+
+Аванс 200 грн можно оплатить у нас в клубе, по номеру карты ниже или по ссылке (сумму нужно указать вручную):
+-----------------------
+4035200042439916
+
+Димитрова Яна Вячеславовна (Моно)
+
+https://pay.mbnk.biz/H3TxgYnnS2nX
+-----------------------
+❗️ ВНИМАНИЕ ❗️
+* Если количество игроков уменьшится или сократится игровое время, оплата остаётся 100%, а остаток средств зачисляется на баланс игрового счёта.
+* Если игроки добавляются, пожалуйста, согласуйте это заранее, иначе может не быть свободных мест 😢
+
+С уважением, клуб виртуальной реальности MirVR, администратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Европейская, 89 (Екатерининская)
+🌐 https://mirvr.com.ua`;
+
+    ua = `Вітаємо, ${CLIENT_NAME} 👋
+
+Ви забронювали ігровий час у клубі MirVR на:
+
+🔔 Дата: ${DATE_UA}
+⌛️ Час: ${TIME_FROM} – ${TIME_TO}
+🎮 Кількість учасників: ${PLAYERS}
+💰 Вартість: ${PRICE} грн
+
++50 грн/год/люд доплата за квест, якщо ви оберете його на місці.
+
+Будемо раді бачити вас у гостях за 5–10 хвилин до початку ігрового часу.
+
+Аванс 200 грн можна сплатити у нас у клубі, за номером картки нижче або за посиланням (суму потрібно вказати вручну):
+-----------------------
+4035200042439916
+
+Дімітрова Яна В’ячеславівна (Моно)
+
+https://pay.mbnk.biz/H3TxgYnnS2nX
+-----------------------
+❗️ УВАГА ❗️
+* Якщо кількість гравців зменшиться або скоротиться ігровий час, оплата залишається 100%, а залишок коштів зараховується на баланс ігрового рахунку.
+* Якщо гравці додаються, погодьте, будь ласка, заздалегідь, інакше може не бути вільних місць 😢
+
+З повагою, клуб віртуальної реальності MirVR, адміністратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Європейська, 89 (Катеринінська)
+🌐 https://mirvr.com.ua`;
+  } else if (msgType === 'birthday') {
+    ru = `Здравствуйте, ${CLIENT_NAME}! ☀️
+
+Клуб виртуальной реальности MirVR рад предложить вам организацию Дня рождения.
+
+Ниже указаны основные моменты проведения праздника. Если у вас останутся вопросы — с радостью обсудим! 😊
+
+1️⃣ Встреча гостей и банкет
+На сбор гостей и банкет обычно уходит около 30 минут, после чего дети переходят к играм.
+Ещё около 30 минут банкета может проходить после или внутри игрового времени — эти 60 минут не оплачиваются, но входят в общее время праздника.
+
+2️⃣ Игровое время
+Стандартное игровое время — 3 часа (1,5 часа игр + 30 минут торта + 1,5 часа игр). Можно забронировать и другие варианты, при этом скидка 50% действует на каждый час, начиная с третьего часа игр.
+
+3️⃣ Торжественная часть
+После игр — около 30 минут на торт, поздравления именинника, пиньяту и настольные игры.
+
+4️⃣ Индивидуальность
+Если вы хотите, чтобы во время праздника в клубе не было других посетителей, нужно забронировать все игровые места.
+
+5️⃣ Заказ еды
+Вы можете заказать еду самостоятельно по нашему адресу или отправить нам скрин выбранных блюд — мы всё оформим за вас.
+Наш магазин: https://mirvr.wayforpay.shop
+Партнёры:
+https://delivery.pomodoro.od.ua/restaurants/4
+https://smilefood.od.ua
+
+6️⃣ Игровые места
+В клубе есть 11 беспроводных VR-очков Oculus Quest 2 и 3, а также PlayStation.
+
+7️⃣ Цены
+VR:
+- Будни с 11:00 до 18:00: 300 грн/час/чел
+- После 18:00 и в выходные: 350 грн/час/чел
+PlayStation (до 4 игроков):
+- Будни с 11:00 до 18:00: 300 грн/час
+- После 18:00 и в выходные: 350 грн/час
+Квесты: +50 грн/чел/час.
+
+8️⃣ Форс-мажор
+Если гостей пришло меньше или произошёл форс-мажор, неиспользованная сумма или аванс зачисляются на персональный счёт в клубе (на 6 месяцев).
+
+9️⃣ Расчёт и тайминг под ваш запрос
+
+💰 Расчёт:
+${ctx.detail}
+
+Дополнительно: +50 грн/чел за квесты (по желанию на месте).
+
+🔟 Аванс
+Для бронирования необходимо внести аванс — ${DEPOSIT} грн (50%). Чем раньше, тем лучше, так как места могут быть заняты другими клиентами.
+
+❗️Аванс не возвращается, но гарантирует бронирование игровых мест❗️
+
+Отзывы: https://g.page/r/CS-kLQe9DbDjEBM
+
+С уважением, клуб виртуальной реальности MirVR, администратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Европейская, 89 (Екатерининская)
+🌐 https://mirvr.com.ua/birthday`;
+
+    ua = `Вітаємо, ${CLIENT_NAME}! ☀️
+
+Клуб віртуальної реальності MirVR радий запропонувати Вам організацію 🥳 Дня народження 🥳
+
+Нижче наведені основні моменти проведення заходу. Якщо у Вас залишаться питання, з радістю обговоримо! 😊
+
+1️⃣ Зустріч гостей та банкет
+На збори та банкет зазвичай йде близько 30 хвилин, після чого діти переходять до ігор.
+Ще близько 30 хвилин банкету може проходити після або всередині ігрового часу — ці 60 хвилин не оплачуються, але входять у загальний час свята.
+
+2️⃣ Ігровий час
+Стандартний ігровий час — 3 години (1,5 години ігор + 30 хвилин торта + 1,5 години ігор). Можна забронювати й інші варіанти, при цьому знижка 50% діє на кожну годину, починаючи з третьої години ігор.
+
+3️⃣ Урочиста частина
+Після ігор — приблизно 30 хвилин на торт, привітання іменинника, піньяту та настільні ігри.
+
+4️⃣ Індивідуальність
+Якщо хочете, щоб у клубі не було інших гостей, потрібно забронювати всі ігрові місця.
+
+5️⃣ Їжа
+Магазин: https://mirvr.wayforpay.shop
+Партнери:
+https://delivery.pomodoro.od.ua/restaurants/4
+https://smilefood.od.ua
+
+6️⃣ Ігрові місця
+У клубі 11 VR-гарнітур Oculus Quest 2/3 та PlayStation.
+
+7️⃣ Ціни
+VR:
+- Будні 11:00–18:00: 300 грн/год/особа
+- Після 18:00 та вихідні: 350 грн/год/особа
+PlayStation (до 4 гравців):
+- Будні 11:00–18:00: 300 грн/год
+- Після 18:00 та вихідні: 350 грн/год
+Квести: +50 грн/особа/год.
+
+8️⃣ Форс-мажор
+Якщо гостей прийшло менше або стався форс-мажор, невикористана сума або аванс зараховуються на персональний рахунок (на 6 місяців).
+
+9️⃣ Розрахунок та таймінг за Вашим запитом
+
+💰 Розрахунок:
+${ctx.detail}
+
+Додатково: +50 грн/особа за квести (за бажанням на місці).
+
+🔟 Аванс
+Для бронювання необхідно внести аванс — ${DEPOSIT} грн (50%).
+
+❗️Аванс не повертається, але гарантує бронювання ігрових місць❗️
+
+Відгуки: https://g.page/r/CS-kLQe9DbDjEBM
+
+З повагою, клуб віртуальної реальності MirVR, адміністратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Європейська, 89 (Катеринінська)
+🌐 https://mirvr.com.ua/birthday`;
+  }
+
+  msgRuEl.value = ru;
+  msgUaEl.value = ua;
+}
+
+document.getElementById('calcBtn').addEventListener('click', calc);
+[
+  gameDateEl,
+  startEl,
+  endEl,
+  placesEl,
+  discountTypeEl,
+  msgTypeEl,
+  adminNameEl,
+  clientNameEl
+].forEach(el => el.addEventListener('input', calc));
+
+document.getElementById('copyMsgBtn').addEventListener('click', async () => {
+  try {
+    const txt = `${msgRuEl.value}
+
+---
+
+${msgUaEl.value}`;
+    await navigator.clipboard.writeText(txt);
+    const btn  = document.getElementById('copyMsgBtn');
+    const prev = btn.textContent;
+    btn.textContent = 'Скопировано';
+    setTimeout(() => (btn.textContent = prev), 1200);
+  } catch (e) {}
+});
+
+document.getElementById('themeBtn').addEventListener('click', () => {
+  const root = document.documentElement;
+  root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+});
+
+calc();
+</script>
+</body>
+</html>
