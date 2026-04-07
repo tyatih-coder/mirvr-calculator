@@ -183,7 +183,7 @@ const dd    = String(today.getDate()).padStart(2, '0');
 gameDateEl.value = `${yyyy}-${mm}-${dd}`;
 
 function money(v) {
-  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(v) + ' грн';
+  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(Math.round(v)) + ' грн';
 }
 
 function toMinutes(str) {
@@ -209,59 +209,46 @@ function getDayType() {
   };
 }
 
-// тариф для конкретной минуты
 function rateForMinute(minute, isWeekday) {
   if (!isWeekday) return RATE_WEEKEND;
   return minute < SWITCH_MINUTES ? RATE_WEEKDAY_BEFORE_18 : RATE_WEEKDAY_AFTER_18;
 }
 
-// Обычная бронь: без скидок
+// Обычная бронь — без скидок
 function calcRegular(start, end, places, dayType) {
   const timeline = [];
   let baseTotal = 0;
 
-  // разбиваем на два возможных тарифа: до 18:00 и после
   const segments = [];
   if (dayType.isWeekday) {
     if (start < SWITCH_MINUTES) {
       segments.push({
-        start: start,
+        start,
         end: Math.min(end, SWITCH_MINUTES),
         rate: RATE_WEEKDAY_BEFORE_18,
-        period: 'before'
+        label: 'до 18:00'
       });
     }
     if (end > SWITCH_MINUTES) {
       segments.push({
         start: Math.max(start, SWITCH_MINUTES),
-        end: end,
+        end,
         rate: RATE_WEEKDAY_AFTER_18,
-        period: 'after'
+        label: 'после 18:00'
       });
     }
   } else {
-    segments.push({
-      start,
-      end,
-      rate: RATE_WEEKEND,
-      period: 'weekend'
-    });
+    segments.push({ start, end, rate: RATE_WEEKEND, label: 'выходной/праздник' });
   }
 
   segments.forEach(seg => {
     const hours = (seg.end - seg.start) / 60;
-    const periodTitle =
-      seg.period === 'before' ? 'до 18:00' :
-      seg.period === 'after'  ? 'после 18:00' :
-      'выходной/праздник';
-
     const sum = seg.rate * hours * places;
     baseTotal += sum;
-
     timeline.push({
       start: seg.start,
       end: seg.end,
-      text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}): ${hours.toFixed(2).replace('.', ',')} ч × ${seg.rate} × ${places} мест = ${money(sum)}`
+      text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${seg.label}): ${hours.toFixed(2).replace('.', ',')} ч × ${seg.rate} × ${places} мест = ${money(sum)}`
     });
   });
 
@@ -279,7 +266,7 @@ function calcBirthday(start, end, places, dayType) {
   let discountTotal = 0;
   let discountLine = '';
 
-  // Определяем игровые интервалы
+  // Интервалы игр
   let gameIntervals = [];
   if (totalMinutes > BANQUET1_MIN + BANQUET2_MIN) {
     const banquet1Start = start;
@@ -307,35 +294,29 @@ function calcBirthday(start, end, places, dayType) {
       { start: game2Start, end: game2End }
     ];
   } else {
-    // нет места для банкетов — всё игровое
     gameIntervals = [{ start, end }];
   }
 
-  // 1) считаем игровые блоки по тарифам × все игроки
+  // Сегменты игр по тарифам
   const gameSegments = [];
-
   gameIntervals.forEach(g => {
     if (dayType.isWeekday) {
       if (g.start < SWITCH_MINUTES) {
         gameSegments.push({
           start: g.start,
           end: Math.min(g.end, SWITCH_MINUTES),
-          period: 'before'
+          label: 'до 18:00'
         });
       }
       if (g.end > SWITCH_MINUTES) {
         gameSegments.push({
           start: Math.max(g.start, SWITCH_MINUTES),
           end: g.end,
-          period: 'after'
+          label: 'после 18:00'
         });
       }
     } else {
-      gameSegments.push({
-        start: g.start,
-        end: g.end,
-        period: 'weekend'
-      });
+      gameSegments.push({ start: g.start, end: g.end, label: 'выходной/праздник' });
     }
   });
 
@@ -343,55 +324,43 @@ function calcBirthday(start, end, places, dayType) {
   gameSegments.forEach(seg => { totalGameMinutes += (seg.end - seg.start); });
   const totalGameHours = totalGameMinutes / 60;
 
+  // Базовая сумма за все игры (все игроки)
   gameSegments.forEach(seg => {
     const rate = rateForMinute(seg.start, dayType.isWeekday);
     const hours = (seg.end - seg.start) / 60;
-    const periodTitle =
-      seg.period === 'before' ? 'до 18:00' :
-      seg.period === 'after'  ? 'после 18:00' :
-      'выходной/праздник';
-
     const sum = rate * hours * places;
     baseTotal += sum;
-
     timeline.push({
       start: seg.start,
       end: seg.end,
-      text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}): ${hours.toFixed(2).replace('.', ',')} ч × ${rate} × ${places} мест = ${money(sum)}`
+      text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${seg.label}): ${hours.toFixed(2).replace('.', ',')} ч × ${rate} × ${places} мест = ${money(sum)}`
     });
   });
 
-  // 2) считаем скидку
+  // Скидка
   if (totalGameHours >= 3) {
-    // поминутно считаем стоимость третьего часа (минуты 120–180 от начала игр)
-    const gameMinutes = [];
+    // собираем все игровые минуты в хронологическом порядке
+    const minutesList = [];
     gameIntervals.forEach(interval => {
       for (let m = interval.start; m < interval.end; m++) {
-        gameMinutes.push(m);
+        minutesList.push(m);
       }
     });
+    minutesList.sort((a, b) => a - b);
 
-    if (gameMinutes.length > 0) {
-      const sorted = gameMinutes.sort((a, b) => a - b);
-      const thirdStartIndex = 120; // минута № 121, но индекс 120
-      const thirdEndIndex   = 180; // до минуты № 180 включительно, индекс 179
+    // минуты, начиная с 3-го часа (после 120-й игровой минуты)
+    const discountMinutes = minutesList.slice(120); // всё от 121‑й игровой минуты и дальше
 
-      let thirdHourCostAllPlayers = 0;
+    let tailCostAllPlayers = 0;
+    discountMinutes.forEach(minute => {
+      const rate = rateForMinute(minute, dayType.isWeekday);
+      tailCostAllPlayers += rate * (1 / 60) * places;
+    });
 
-      for (let i = thirdStartIndex; i < Math.min(thirdEndIndex, sorted.length); i++) {
-        const minute = sorted[i];
-        const rate = rateForMinute(minute, dayType.isWeekday);
-        thirdHourCostAllPlayers += rate * (1 / 60) * places;
-      }
-
-      discountTotal = thirdHourCostAllPlayers * 0.5;
-      discountLine = `Скидка на третий час: ${money(discountTotal)}`;
-    } else {
-      discountTotal = 0;
-      discountLine = 'Скидка на третий час: 0 грн';
-    }
+    discountTotal = tailCostAllPlayers * 0.5;
+    discountLine = `Скидка начиная с 3-го часа (50%): ${money(discountTotal)}`;
   } else {
-    // игр < 3 часов: считаем стоимость одного игрока и даём 50% скидку
+    // игр меньше 3-х часов — скидка 50% для 1 игрока
     let onePlayerTotal = 0;
     gameSegments.forEach(seg => {
       const rate = rateForMinute(seg.start, dayType.isWeekday);
@@ -710,11 +679,11 @@ document.getElementById('copyMsgBtn').addEventListener('click', async () => {
 ---
 
 ${msgUaEl.value}`;
-  await navigator.clipboard.writeText(txt);
-  const btn  = document.getElementById('copyMsgBtn');
-  const prev = btn.textContent;
-  btn.textContent = 'Скопировано';
-  setTimeout(() => (btn.textContent = prev), 1200);
+    await navigator.clipboard.writeText(txt);
+    const btn  = document.getElementById('copyMsgBtn');
+    const prev = btn.textContent;
+    btn.textContent = 'Скопировано';
+    setTimeout(() => (btn.textContent = prev), 1200);
   } catch (e) {}
 });
 
