@@ -245,6 +245,156 @@ function splitByTariff(start, end, isWeekday) {
   return out;
 }
 
+function calcBirthday(start, end, places, dayType) {
+  const totalMinutes = end - start;
+  const timeline = [];
+  let baseTotal = 0;
+  let discountTotal = 0;
+
+  // 30 мин банкет + 30 мин торт, если хватает времени
+  const BANQUET1_MIN = 30;
+  const BANQUET2_MIN = 30;
+
+  let gameplaySegments = [];
+
+  if (totalMinutes > BANQUET1_MIN + BANQUET2_MIN) {
+    const banquet1Start = start;
+    const banquet1End   = start + BANQUET1_MIN;
+
+    const playMinutesTotal = totalMinutes - BANQUET1_MIN - BANQUET2_MIN;
+    const eachPlay         = playMinutesTotal / 2;
+
+    const game1Start = banquet1End;
+    const game1End   = game1Start + eachPlay;
+
+    const banquet2Start = game1End;
+    const banquet2End   = banquet2Start + BANQUET2_MIN;
+
+    const game2Start = banquet2End;
+    const game2End   = game2Start + eachPlay;
+
+    timeline.push(
+      { start: banquet1Start, end: banquet1End, text: `${fmtTime(banquet1Start)}–${fmtTime(banquet1End)} банкет — 30 минут` },
+      { start: banquet2Start, end: banquet2End, text: `${fmtTime(banquet2Start)}–${fmtTime(banquet2End)} торжественная часть / торт — 30 минут` }
+    );
+
+    gameplaySegments = [
+      ...splitByTariff(game1Start, game1End, dayType.isWeekday),
+      ...splitByTariff(game2Start, game2End, dayType.isWeekday)
+    ];
+  } else {
+    // Времени мало — всё считаем как игровые минуты, без банкетов
+    gameplaySegments = splitByTariff(start, end, dayType.isWeekday);
+  }
+
+  const totalGameHours = gameplaySegments.reduce((s, seg) => s + seg.hours, 0);
+
+  if (totalGameHours >= 3) {
+    // Скидка 50% на все часы после 3‑го часа игр (для всех игроков)
+    let gameHourAccum = 0;
+
+    gameplaySegments.forEach(seg => {
+      let remaining = seg.hours;
+      let cursor    = seg.start;
+
+      while (remaining > 0) {
+        const thisChunk = remaining;
+
+        const hourIndexStart = gameHourAccum;
+        const hourIndexEnd   = gameHourAccum + thisChunk;
+
+        const discountedPart = Math.max(0, hourIndexEnd - 3);
+        const fullRatePart   = thisChunk - discountedPart;
+
+        const baseChunk     = seg.rate * thisChunk * places;
+        const discountChunk = seg.rate * discountedPart * places * 0.5;
+        const finalChunk    = baseChunk - discountChunk;
+
+        baseTotal     += baseChunk;
+        discountTotal += discountChunk;
+
+        const periodTitle =
+          seg.period === 'before' ? 'до 18:00' :
+          seg.period === 'after'  ? 'после 18:00' :
+          'выходной/праздник';
+
+        let line;
+        if (discountChunk > 0) {
+          line = `${fmtTime(cursor)}–${fmtTime(cursor + thisChunk * 60)} (${periodTitle}) со скидкой 50%: ${thisChunk
+            .toFixed(2)
+            .replace('.', ',')} ч × ${seg.rate} × 50% × ${places} мест = ${money(finalChunk)}`;
+        } else {
+          line = `${fmtTime(cursor)}–${fmtTime(cursor + thisChunk * 60)} (${periodTitle}): ${thisChunk
+            .toFixed(2)
+            .replace('.', ',')} ч × ${seg.rate} × ${places} мест = ${money(finalChunk)}`;
+        }
+
+        timeline.push({
+          start: cursor,
+          end: cursor + thisChunk * 60,
+          text: line
+        });
+
+        gameHourAccum += thisChunk;
+        remaining     -= thisChunk;
+        cursor        += thisChunk * 60;
+      }
+    });
+  } else {
+    // Игр < 3 часов → 50% на одного игрока на все игровые часы
+    gameplaySegments.forEach(seg => {
+      const periodTitle =
+        seg.period === 'before' ? 'до 18:00' :
+        seg.period === 'after'  ? 'после 18:00' :
+        'выходной/праздник';
+
+      const baseSegment = seg.rate * seg.hours * places;
+      baseTotal += baseSegment;
+
+      const discountSegment = seg.rate * seg.hours * 0.5; // скидка для одного игрока
+      discountTotal += discountSegment;
+
+      const finalSegment = baseSegment - discountSegment;
+
+      timeline.push({
+        start: seg.start,
+        end: seg.end,
+        text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}) со скидкой 50% для 1 игрока: ${seg.hours
+          .toFixed(2)
+          .replace('.', ',')} ч × ${seg.rate} × ${places} мест − ${money(discountSegment)} = ${money(finalSegment)}`
+      });
+    });
+  }
+
+  return { baseTotal, discountTotal, timeline };
+}
+
+function calcRegular(start, end, places, dayType) {
+  const segments = splitByTariff(start, end, dayType.isWeekday);
+  const timeline = [];
+  let baseTotal = 0;
+
+  segments.forEach(seg => {
+    const periodTitle =
+      seg.period === 'before' ? 'до 18:00' :
+      seg.period === 'after'  ? 'после 18:00' :
+      'выходной/праздник';
+
+    const segmentSum = seg.rate * seg.hours * places;
+    baseTotal += segmentSum;
+
+    timeline.push({
+      start: seg.start,
+      end: seg.end,
+      text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}): ${seg.hours
+        .toFixed(2)
+        .replace('.', ',')} ч × ${seg.rate} × ${places} мест = ${money(segmentSum)}`
+    });
+  });
+
+  return { baseTotal, discountTotal: 0, timeline };
+}
+
 function calc() {
   const places       = Math.max(1, Number(placesEl.value || 1));
   const start        = toMinutes(startEl.value);
@@ -252,7 +402,6 @@ function calc() {
   const dayType      = getDayType();
   dayTypeBadgeEl.textContent = dayType.label;
 
-  // Пока все поля не заполнены — не считаем
   if (
     !clientNameEl.value.trim() ||
     !adminNameEl.value.trim() ||
@@ -292,169 +441,30 @@ function calc() {
     };
   }
 
-  const msgType    = msgTypeEl.value;
-  const timeline   = [];
-  let baseTotal    = 0;
+  const msgType = msgTypeEl.value;
+  let baseTotal = 0;
   let discountTotal = 0;
+  let timeline = [];
 
-  const totalMinutes = end - start;
-  let gameplaySegments = [];
-
-  // День рождения: учитываем банкеты и игровые блоки
   if (msgType === 'birthday') {
-    // 30 минут на первый банкет
-    const banquet1Start = start;
-    const banquet1End   = start + 30;
-
-    // 30 минут на торт/торжественную часть
-    const banquet2Duration = 30;
-
-    // Игровое время = всё остальное
-    const playMinutesTotal = totalMinutes - 30 - banquet2Duration;
-
-    let game1Start, game1End, banquet2Start, banquet2End, game2Start, game2End;
-
-    if (playMinutesTotal > 0) {
-      // Если времени достаточно для двух игровых блоков и банкетов
-      const eachPlay = playMinutesTotal / 2;
-
-      game1Start = banquet1End;
-      game1End   = game1Start + eachPlay;
-
-      banquet2Start = game1End;
-      banquet2End   = banquet2Start + banquet2Duration;
-
-      game2Start = banquet2End;
-      game2End   = game2Start + eachPlay;
-
-      // Банкетные блоки в разбивке
-      timeline.push(
-        { start: banquet1Start, end: banquet1End, text: `${fmtTime(banquet1Start)}–${fmtTime(banquet1End)} банкет — 30 минут` },
-        { start: banquet2Start, end: banquet2End, text: `${fmtTime(banquet2Start)}–${fmtTime(banquet2End)} торжественная часть / торт — 30 минут` }
-      );
-
-      // Игровые сегменты попадают в расчёт
-      gameplaySegments = [
-        ...splitByTariff(game1Start, game1End, dayType.isWeekday),
-        ...splitByTariff(game2Start, game2End, dayType.isWeekday)
-      ];
-    } else {
-      // Если времени мало, считаем всё время (без разрезания на банкеты) как игры
-      gameplaySegments = splitByTariff(start, end, dayType.isWeekday);
-    }
-
-    // Считаем общее игровое время
-    const totalGameHours = gameplaySegments.reduce((sum, seg) => sum + seg.hours, 0);
-
-    if (totalGameHours >= 3) {
-      // Старая логика: скидка 50% с 3-го часа игр и дальше
-      let gameHourAccum = 0;
-
-      gameplaySegments.forEach(seg => {
-        let remaining = seg.hours;
-        let cursor    = seg.start;
-
-        while (remaining > 0) {
-          const thisChunk = remaining;
-          const hourIndexStart = gameHourAccum;
-          const hourIndexEnd   = gameHourAccum + thisChunk;
-
-          const discountedPart = Math.max(0, hourIndexEnd - 3);
-          const fullRatePart   = thisChunk - discountedPart;
-
-          const baseChunk      = seg.rate * thisChunk * places;
-          const discountChunk  = seg.rate * discountedPart * places * 0.5;
-          const finalChunk     = baseChunk - discountChunk;
-
-          baseTotal     += baseChunk;
-          discountTotal += discountChunk;
-
-          const periodTitle =
-            seg.period === 'before' ? 'до 18:00' :
-            seg.period === 'after'  ? 'после 18:00' :
-            'выходной/праздник';
-
-          if (discountChunk > 0) {
-            timeline.push({
-              start: cursor,
-              end: cursor + thisChunk * 60,
-              text: `${fmtTime(cursor)}–${fmtTime(cursor + thisChunk * 60)} (${periodTitle}) со скидкой 50%: ${thisChunk
-                .toFixed(2)
-                .replace('.', ',')} ч × ${seg.rate} × 50% × ${places} мест = ${money(finalChunk)}`
-            });
-          } else {
-            timeline.push({
-              start: cursor,
-              end: cursor + thisChunk * 60,
-              text: `${fmtTime(cursor)}–${fmtTime(cursor + thisChunk * 60)} (${periodTitle}): ${thisChunk
-                .toFixed(2)
-                .replace('.', ',')} ч × ${seg.rate} × ${places} мест = ${money(finalChunk)}`
-            });
-          }
-
-          gameHourAccum += thisChunk;
-          remaining     -= thisChunk;
-          cursor        += thisChunk * 60;
-        }
-      });
-    } else {
-      // Новая логика: если до 3-го часа игр не дотянули —
-      // скидка 50% на одного игрока на все игровые часы
-      gameplaySegments.forEach(seg => {
-        const periodTitle =
-          seg.period === 'before' ? 'до 18:00' :
-          seg.period === 'after'  ? 'после 18:00' :
-          'выходной/праздник';
-
-        const baseSegment = seg.rate * seg.hours * places;
-        baseTotal += baseSegment;
-
-        const discountSegment = seg.rate * seg.hours * 0.5; // 50% для одного игрока
-        discountTotal += discountSegment;
-
-        const finalSegment = baseSegment - discountSegment;
-
-        timeline.push({
-          start: seg.start,
-          end: seg.end,
-          text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}) со скидкой 50% для 1 игрока: ${seg.hours
-            .toFixed(2)
-            .replace('.', ',')} ч × ${seg.rate} × ${places} мест − ${money(discountSegment)} = ${money(finalSegment)}`
-        });
-      });
-    }
-
+    const res = calcBirthday(start, end, places, dayType);
+    baseTotal     = res.baseTotal;
+    discountTotal = res.discountTotal;
+    timeline      = res.timeline;
   } else {
-    // Обычная бронь: без скидок, только тариф × время × места
-    const segments = splitByTariff(start, end, dayType.isWeekday);
-
-    segments.forEach(seg => {
-      const periodTitle =
-        seg.period === 'before' ? 'до 18:00' :
-        seg.period === 'after'  ? 'после 18:00' :
-        'выходной/праздник';
-
-      const segmentSum = seg.rate * seg.hours * places;
-      baseTotal += segmentSum;
-
-      timeline.push({
-        start: seg.start,
-        end: seg.end,
-        text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${periodTitle}): ${seg.hours
-          .toFixed(2)
-          .replace('.', ',')} ч × ${seg.rate} × ${places} мест = ${money(segmentSum)}`
-      });
-    });
+    const res = calcRegular(start, end, places, dayType);
+    baseTotal     = res.baseTotal;
+    discountTotal = res.discountTotal;
+    timeline      = res.timeline;
   }
 
   const finalTotal = Math.max(0, baseTotal - discountTotal);
 
   totalPayEl.textContent      = money(finalTotal);
   baseTotalEl.textContent     = money(baseTotal);
-  discountValueEl.textContent = discountTotal > 0 ? '−' + money(discountTotal) : money(0);
+  discountValueEl.textContent = discountTotal > 0 ? '−' + money(discountTotal) : '0 грн';
   placesStatEl.textContent    = String(places);
 
-  // Формируем короткий детальный текст (как в примере)
   const headerLines = [
     `Имя клиента: ${clientNameEl.value || 'не указано'}`,
     `Дата: ${gameDateEl.value || 'не выбрана'}`,
@@ -464,9 +474,7 @@ function calc() {
     ''
   ];
 
-  // Сортируем по времени
   timeline.sort((a, b) => a.start - b.start);
-
   const timelineText = timeline.map(t => t.text);
 
   const detailLines = [
