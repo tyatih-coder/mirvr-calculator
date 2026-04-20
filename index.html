@@ -128,10 +128,7 @@
                   <option value="quest">Квест</option>
                 </select>
               </div>
-              <div>
-                <label>&nbsp;</label>
-                <button class="btn secondary" id="copyMsgBtn">Скопировать RU+UA</button>
-              </div>
+
             </div>
           </div>
         </div>
@@ -142,11 +139,17 @@
       <div class="inner">
         <div class="grid">
           <div class="full">
-            <h3>Сообщение для клиента (RU)</h3>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <h3 style="margin:0">Сообщение для клиента (RU)</h3>
+              <button class="btn secondary" onclick="copyExtra('msgRu')">Скопировать RU</button>
+            </div>
             <textarea id="msgRu" rows="18" readonly></textarea>
           </div>
           <div class="full" style="margin-top:16px">
-            <h3>Повідомлення для клієнта (UA)</h3>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <h3 style="margin:0">Повідомлення для клієнта (UA)</h3>
+              <button class="btn secondary" onclick="copyExtra('msgUa')">Скопіювати UA</button>
+            </div>
             <textarea id="msgUa" rows="22" readonly></textarea>
           </div>
         </div>
@@ -1074,16 +1077,7 @@ document.getElementById('calcBtn').addEventListener('click', calc);
   clientNameEl
 ].forEach(el => el.addEventListener('input', calc));
 
-document.getElementById('copyMsgBtn').addEventListener('click', async () => {
-  try {
-    const txt = `${msgRuEl.value}\n\n---\n\n${msgUaEl.value}`;
-    await navigator.clipboard.writeText(txt);
-    const btn  = document.getElementById('copyMsgBtn');
-    const prev = btn.textContent;
-    btn.textContent = 'Скопировано';
-    setTimeout(() => (btn.textContent = prev), 1200);
-  } catch (e) {}
-});
+
 
 document.getElementById('themeBtn').addEventListener('click', () => {
   const root = document.documentElement;
