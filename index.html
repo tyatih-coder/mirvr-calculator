@@ -190,4 +190,1085 @@
             <button class="btn secondary" onclick="openFile('photo4.jpg')">📷 Фото 4</button>
             <button class="btn secondary" onclick="openFile('photo5.jpg')">📷 Фото 5</button>
             <button class="btn secondary" onclick="openFile('photo6.jpg')">📷 Фото 6</button>
-         
+            <button class="btn secondary" onclick="openFile('photo7.jpg')">📷 Фото 7</button>
+            <button class="btn secondary" onclick="openFile('photo8.jpg')">📷 Фото 8</button>
+            <button class="btn secondary" onclick="openFile('photo9.jpg')">📷 Фото 9</button>
+            <button class="btn secondary" onclick="openFile('https://drive.google.com/file/d/1xPy0qkqywyWcbb1Q5zKyyzC0xGQGfftm/view?usp=drive_link')">🎬 Відео 1</button>
+            <button class="btn secondary" onclick="openFile('https://drive.google.com/file/d/1qq9LWGtH7oxR5P4cswXenEnHhHvQ2CDs/view?usp=drive_link')">🎬 Відео 2</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+<script>
+const RATE_WEEKDAY_BEFORE_18 = 300;
+const RATE_WEEKDAY_AFTER_18  = 350;
+const RATE_WEEKEND           = 350;
+const RATE_QUEST_WEEKDAY_BEFORE_18 = 350;
+const RATE_QUEST_OTHER             = 400;
+const SWITCH_MINUTES         = 18 * 60;
+
+const gameDateEl      = document.getElementById('gameDate');
+const dayTypeBadgeEl  = document.getElementById('dayTypeBadge');
+const startEl         = document.getElementById('start');
+const endEl           = document.getElementById('end');
+const placesEl        = document.getElementById('places');
+const adminNameEl     = document.getElementById('adminName');
+const clientNameEl    = document.getElementById('clientName');
+
+const totalPayEl      = document.getElementById('totalPay');
+const baseTotalEl     = document.getElementById('baseTotal');
+const discountValueEl = document.getElementById('discountValue');
+const placesStatEl    = document.getElementById('placesStat');
+const partsViewEl     = document.getElementById('partsView');
+
+const msgTypeEl = document.getElementById('msgType');
+const msgRuEl   = document.getElementById('msgRu');
+const msgUaEl   = document.getElementById('msgUa');
+
+const today = new Date();
+const yyyy  = today.getFullYear();
+const mm    = String(today.getMonth() + 1).padStart(2, '0');
+const dd    = String(today.getDate()).padStart(2, '0');
+gameDateEl.value = `${yyyy}-${mm}-${dd}`;
+
+function money(v) {
+  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(Math.round(v)) + ' грн';
+}
+
+function moneyNum(v) {
+  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(Math.round(v));
+}
+
+function toMinutes(str) {
+  const [h, m] = str.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function fmtTime(min) {
+  const h = Math.floor(min / 60).toString().padStart(2, '0');
+  const m = Math.floor(min % 60).toString().padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+function getDayType() {
+  if (!gameDateEl.value) return { isWeekday: true, label: 'Дата не выбрана', short: 'weekday' };
+  const d   = new Date(gameDateEl.value + 'T12:00:00');
+  const day = d.getDay();
+  const isWeekday = day >= 1 && day <= 5;
+  return {
+    isWeekday,
+    label: isWeekday ? 'Будний день' : 'Выходной/праздник',
+    short: isWeekday ? 'weekday' : 'weekend'
+  };
+}
+
+function rateForMinute(minute, isWeekday) {
+  if (!isWeekday) return RATE_WEEKEND;
+  return minute < SWITCH_MINUTES ? RATE_WEEKDAY_BEFORE_18 : RATE_WEEKDAY_AFTER_18;
+}
+
+// Обычная бронь — без скидок
+function calcRegular(start, end, places, dayType) {
+  const timeline = [];
+  let baseTotal = 0;
+
+  const segments = [];
+  if (dayType.isWeekday) {
+    if (start < SWITCH_MINUTES) {
+      segments.push({
+        start,
+        end: Math.min(end, SWITCH_MINUTES),
+        rate: RATE_WEEKDAY_BEFORE_18,
+        label: 'до 18:00'
+      });
+    }
+    if (end > SWITCH_MINUTES) {
+      segments.push({
+        start: Math.max(start, SWITCH_MINUTES),
+        end,
+        rate: RATE_WEEKDAY_AFTER_18,
+        label: 'после 18:00'
+      });
+    }
+  } else {
+    segments.push({ start, end, rate: RATE_WEEKEND, label: 'выходной/праздник' });
+  }
+
+  segments.forEach(seg => {
+    const hours = (seg.end - seg.start) / 60;
+    const sum = seg.rate * hours * places;
+    baseTotal += sum;
+    timeline.push({
+      start: seg.start,
+      end: seg.end,
+      text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${seg.label}): ${hours.toFixed(2).replace('.', ',')} ч × ${seg.rate} × ${places} мест = ${money(sum)}`
+    });
+  });
+
+  return { baseTotal, discountTotal: 0, timeline, discountLine: 'Скидка: 0 грн' };
+}
+
+// Квест
+function calcQuest(start, end, places, dayType) {
+  const timeline = [];
+  let baseTotal = 0;
+
+  const segments = [];
+  if (dayType.isWeekday) {
+    if (start < SWITCH_MINUTES) {
+      segments.push({
+        start,
+        end: Math.min(end, SWITCH_MINUTES),
+        rate: RATE_QUEST_WEEKDAY_BEFORE_18,
+        label: 'будний до 18:00'
+      });
+    }
+    if (end > SWITCH_MINUTES) {
+      segments.push({
+        start: Math.max(start, SWITCH_MINUTES),
+        end,
+        rate: RATE_QUEST_OTHER,
+        label: 'после 18:00'
+      });
+    }
+  } else {
+    segments.push({ start, end, rate: RATE_QUEST_OTHER, label: 'выходной/праздник' });
+  }
+
+  segments.forEach(seg => {
+    const hours = (seg.end - seg.start) / 60;
+    const sum = seg.rate * hours * places;
+    baseTotal += sum;
+    timeline.push({
+      start: seg.start,
+      end: seg.end,
+      text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${seg.label}): ${hours.toFixed(2).replace('.', ',')} ч × ${seg.rate} × ${places} чел = ${money(sum)}`
+    });
+  });
+
+  return { baseTotal, timeline };
+}
+
+// День рождения — с особыми скидками
+function calcBirthday(start, end, places, dayType) {
+  const totalMinutes = end - start;
+  const BANQUET1_MIN = 30;
+  const BANQUET2_MIN = 30;
+
+  const timeline = [];
+  let baseTotal = 0;
+  let discountTotal = 0;
+  let discountLine = '';
+
+  // Интервалы игр
+  let gameIntervals = [];
+  if (totalMinutes > BANQUET1_MIN + BANQUET2_MIN) {
+    const banquet1Start = start;
+    const banquet1End   = start + BANQUET1_MIN;
+
+    const playMinutesTotal = totalMinutes - BANQUET1_MIN - BANQUET2_MIN;
+    const eachPlay         = playMinutesTotal / 2;
+
+    const game1Start = banquet1End;
+    const game1End   = game1Start + eachPlay;
+
+    const banquet2Start = game1End;
+    const banquet2End   = banquet2Start + BANQUET2_MIN;
+
+    const game2Start = banquet2End;
+    const game2End   = game2Start + eachPlay;
+
+    timeline.push(
+      { start: banquet1Start, end: banquet1End, text: `${fmtTime(banquet1Start)}–${fmtTime(banquet1End)} банкет — 30 минут` },
+      { start: banquet2Start, end: banquet2End, text: `${fmtTime(banquet2Start)}–${fmtTime(banquet2End)} торжественная часть / торт — 30 минут` }
+    );
+
+    gameIntervals = [
+      { start: game1Start, end: game1End },
+      { start: game2Start, end: game2End }
+    ];
+  } else {
+    gameIntervals = [{ start, end }];
+  }
+
+  // Сегменты игр по тарифам
+  const gameSegments = [];
+  gameIntervals.forEach(g => {
+    if (dayType.isWeekday) {
+      if (g.start < SWITCH_MINUTES) {
+        gameSegments.push({
+          start: g.start,
+          end: Math.min(g.end, SWITCH_MINUTES),
+          label: 'до 18:00'
+        });
+      }
+      if (g.end > SWITCH_MINUTES) {
+        gameSegments.push({
+          start: Math.max(g.start, SWITCH_MINUTES),
+          end: g.end,
+          label: 'после 18:00'
+        });
+      }
+    } else {
+      gameSegments.push({ start: g.start, end: g.end, label: 'выходной/праздник' });
+    }
+  });
+
+  let totalGameMinutes = 0;
+  gameSegments.forEach(seg => { totalGameMinutes += (seg.end - seg.start); });
+  const totalGameHours = totalGameMinutes / 60;
+
+  // Базовая сумма за все игры (все игроки)
+  gameSegments.forEach(seg => {
+    const rate = rateForMinute(seg.start, dayType.isWeekday);
+    const hours = (seg.end - seg.start) / 60;
+    const sum = rate * hours * places;
+    baseTotal += sum;
+    timeline.push({
+      start: seg.start,
+      end: seg.end,
+      text: `${fmtTime(seg.start)}–${fmtTime(seg.end)} (${seg.label}): ${hours.toFixed(2).replace('.', ',')} ч × ${rate} × ${places} мест = ${money(sum)}`
+    });
+  });
+
+  // Скидка
+  if (totalGameHours >= 3) {
+    const minutesList = [];
+    gameIntervals.forEach(interval => {
+      for (let m = interval.start; m < interval.end; m++) {
+        minutesList.push(m);
+      }
+    });
+    minutesList.sort((a, b) => a - b);
+
+    const discountMinutes = minutesList.slice(120);
+
+    let tailCostAllPlayers = 0;
+    discountMinutes.forEach(minute => {
+      const rate = rateForMinute(minute, dayType.isWeekday);
+      tailCostAllPlayers += rate * (1 / 60) * places;
+    });
+
+    discountTotal = tailCostAllPlayers * 0.5;
+    discountLine = `Скидка начиная с 3-го часа (50%): ${money(discountTotal)}`;
+  } else {
+    let onePlayerTotal = 0;
+    gameSegments.forEach(seg => {
+      const rate = rateForMinute(seg.start, dayType.isWeekday);
+      const hours = (seg.end - seg.start) / 60;
+      onePlayerTotal += rate * hours;
+    });
+    discountTotal = onePlayerTotal * 0.5;
+    discountLine = `Скидка для 1 игрока (50%): ${money(discountTotal)}`;
+  }
+
+  return { baseTotal, discountTotal, timeline, discountLine };
+}
+
+function calc() {
+  const places       = Math.max(1, Number(placesEl.value || 1));
+  const start        = toMinutes(startEl.value);
+  const end          = toMinutes(endEl.value);
+  const dayType      = getDayType();
+  dayTypeBadgeEl.textContent = dayType.label;
+
+  if (
+    !clientNameEl.value.trim() ||
+    !adminNameEl.value.trim() ||
+    !gameDateEl.value ||
+    !startEl.value ||
+    !endEl.value ||
+    !placesEl.value
+  ) {
+    totalPayEl.textContent      = '0 грн';
+    baseTotalEl.textContent     = '0 грн';
+    discountValueEl.textContent = '0 грн';
+    placesStatEl.textContent    = '0';
+    partsViewEl.textContent     = 'Заполните все поля (имя клиента, администратора, дату, время и количество мест).';
+    msgRuEl.value = '';
+    msgUaEl.value = '';
+    return;
+  }
+
+  if (end <= start) {
+    totalPayEl.textContent      = 'Ошибка';
+    baseTotalEl.textContent     = '—';
+    discountValueEl.textContent = '—';
+    placesStatEl.textContent    = String(places);
+    partsViewEl.textContent     = 'Время конца должно быть позже времени начала.';
+    msgRuEl.value = 'Исправьте время начала и конца.';
+    msgUaEl.value = 'Виправте час початку та завершення.';
+    return;
+  }
+
+  const msgType = msgTypeEl.value;
+  let baseTotal = 0;
+  let discountTotal = 0;
+  let timeline = [];
+  let discountLine = '';
+
+  if (msgType === 'birthday') {
+    const res = calcBirthday(start, end, places, dayType);
+    baseTotal     = res.baseTotal;
+    discountTotal = res.discountTotal;
+    timeline      = res.timeline;
+    discountLine  = res.discountLine;
+  } else if (msgType === 'quest') {
+    const res = calcQuest(start, end, places, dayType);
+    baseTotal     = res.baseTotal;
+    discountTotal = 0;
+    timeline      = res.timeline;
+    discountLine  = '';
+  } else {
+    const res = calcRegular(start, end, places, dayType);
+    baseTotal     = res.baseTotal;
+    discountTotal = res.discountTotal;
+    timeline      = res.timeline;
+    discountLine  = res.discountLine;
+  }
+
+  const finalTotal = Math.max(0, baseTotal - discountTotal);
+
+  totalPayEl.textContent      = money(finalTotal);
+  baseTotalEl.textContent     = money(baseTotal);
+  discountValueEl.textContent = discountTotal > 0 ? '−' + money(discountTotal) : '0 грн';
+  placesStatEl.textContent    = String(places);
+
+  const headerLines = [
+    `Имя клиента: ${clientNameEl.value || 'не указано'}`,
+    `Дата: ${gameDateEl.value || 'не выбрана'}`,
+    `Тип дня: ${dayType.label}`,
+    `Игровые места: ${places}`,
+    `Время: ${startEl.value}–${endEl.value}`,
+    ''
+  ];
+
+  timeline.sort((a, b) => a.start - b.start);
+  const timelineText = timeline.map(t => t.text);
+
+  const detailLines = [
+    ...headerLines,
+    ...timelineText,
+    '',
+    discountLine,
+    '',
+    `Итого к оплате: ${money(finalTotal)}`,
+    `Дополнительно: +50 грн/час/чел за квест (по желанию на месте).`
+  ];
+
+  const detail = detailLines.join('\n');
+  partsViewEl.textContent = detail;
+
+  generateMessages({
+    date: gameDateEl.value,
+    timeFrom: startEl.value,
+    timeTo: endEl.value,
+    players: places,
+    price: finalTotal,
+    admin: adminNameEl.value || 'администратор',
+    client: clientNameEl.value || 'гость',
+    baseTotal,
+    finalTotal,
+    discountTotal,
+    dayType: dayType.short,
+    isWeekday: dayType.isWeekday,
+    detail,
+    start,
+    end
+  });
+}
+
+function formatDateUaRu(dateStr) {
+  if (!dateStr) return { ru: '', ua: '' };
+  const [y, m, d] = dateStr.split('-');
+  const pretty = `${d}.${m}.${y}`;
+  return { ru: pretty, ua: pretty };
+}
+
+// Build birthday timeline block (UA or RU)
+function buildBirthdayTimeline(startMin, endMin, lang) {
+  const totalMinutes = endMin - startMin;
+  const BANQUET1_MIN = 30;
+  const BANQUET2_MIN = 30;
+
+  if (totalMinutes <= 60) {
+    // Not enough time for full structure — just show games
+    const t1 = fmtTime(startMin);
+    const t2 = fmtTime(endMin);
+    if (lang === 'ua') {
+      return `${t1} – ${t2} : Ігри і танці`;
+    } else {
+      return `${t1} – ${t2} : Игры и танцы`;
+    }
+  }
+
+  const banquet1Start = startMin;
+  const banquet1End   = startMin + BANQUET1_MIN;
+
+  const playMinutesTotal = totalMinutes - BANQUET1_MIN - BANQUET2_MIN;
+  // Round each game block to nearest 15 min so times look clean
+  const eachPlay = Math.round((playMinutesTotal / 2) / 15) * 15;
+
+  const game1Start = banquet1End;
+  const game1End   = game1Start + eachPlay;
+
+  const banquet2Start = game1End;
+  const banquet2End   = banquet2Start + BANQUET2_MIN;
+
+  const game2Start = banquet2End;
+  const game2End   = game2Start + eachPlay;
+
+  if (lang === 'ua') {
+    return [
+      `${fmtTime(banquet1Start)} – ${fmtTime(banquet1End)} : Збір гостей та банкет`,
+      `${fmtTime(game1Start)} – ${fmtTime(game1End)} : Ігри і танці`,
+      `${fmtTime(banquet2Start)} – ${fmtTime(banquet2End)} : Торт і привітання`,
+      `${fmtTime(game2Start)} – ${fmtTime(game2End)} : Ігри і збір`
+    ].join('\n');
+  } else {
+    return [
+      `${fmtTime(banquet1Start)} – ${fmtTime(banquet1End)} : Сбор гостей и банкет`,
+      `${fmtTime(game1Start)} – ${fmtTime(game1End)} : Игры и танцы`,
+      `${fmtTime(banquet2Start)} – ${fmtTime(banquet2End)} : Торт и поздравления`,
+      `${fmtTime(game2Start)} – ${fmtTime(game2End)} : Игры и завершение`
+    ].join('\n');
+  }
+}
+
+// Build birthday calculation block (UA or RU)
+function buildBirthdayCalcBlock(startMin, endMin, places, isWeekday, discountTotal, finalTotal, lang) {
+  const totalMinutes = endMin - startMin;
+  const BANQUET1_MIN = 30;
+  const BANQUET2_MIN = 30;
+
+  // Determine game intervals (same logic as calcBirthday)
+  let gameIntervals = [];
+  if (totalMinutes > BANQUET1_MIN + BANQUET2_MIN) {
+    const banquet1End      = startMin + BANQUET1_MIN;
+    const playMinutesTotal = totalMinutes - BANQUET1_MIN - BANQUET2_MIN;
+    const eachPlay         = playMinutesTotal / 2;
+    const game1Start = banquet1End;
+    const game1End   = game1Start + eachPlay;
+    const banquet2End = game1End + BANQUET2_MIN;
+    const game2Start = banquet2End;
+    const game2End   = game2Start + eachPlay;
+    gameIntervals = [
+      { start: game1Start, end: game1End },
+      { start: game2Start, end: game2End }
+    ];
+  } else {
+    gameIntervals = [{ start: startMin, end: endMin }];
+  }
+
+  // Collect game segments per rate
+  const gameSegments = [];
+  gameIntervals.forEach(g => {
+    if (isWeekday) {
+      if (g.start < SWITCH_MINUTES) {
+        gameSegments.push({
+          start: g.start,
+          end: Math.min(g.end, SWITCH_MINUTES),
+          rate: RATE_WEEKDAY_BEFORE_18
+        });
+      }
+      if (g.end > SWITCH_MINUTES) {
+        gameSegments.push({
+          start: Math.max(g.start, SWITCH_MINUTES),
+          end: g.end,
+          rate: RATE_WEEKDAY_AFTER_18
+        });
+      }
+    } else {
+      gameSegments.push({ start: g.start, end: g.end, rate: RATE_WEEKEND });
+    }
+  });
+
+  // Merge segments with the same rate
+  const rateMap = {};
+  gameSegments.forEach(seg => {
+    const rate = seg.rate;
+    if (!rateMap[rate]) rateMap[rate] = 0;
+    rateMap[rate] += (seg.end - seg.start);
+  });
+
+  const lines = [];
+  const rates = Object.keys(rateMap).map(Number).sort((a, b) => a - b);
+
+  rates.forEach(rate => {
+    const minutes = rateMap[rate];
+    const hours = minutes / 60;
+    const sum = rate * hours * places;
+    // Format hours: show as integer if whole, otherwise show decimal
+    const hoursStr = Number.isInteger(hours) ? String(hours) : hours.toFixed(1).replace('.', ',');
+    if (lang === 'ua') {
+      lines.push(`${rate} грн/год × ${places} місць × ${hoursStr} год = ${moneyNum(sum)} грн`);
+    } else {
+      lines.push(`${rate} грн/ч × ${places} мест × ${hoursStr} ч = ${moneyNum(sum)} грн`);
+    }
+  });
+
+  if (discountTotal > 0) {
+    if (lang === 'ua') {
+      lines.push(`Знижка з 3-ї години (50%): –${moneyNum(discountTotal)} грн`);
+    } else {
+      lines.push(`Скидка с 3-го часа (50%): –${moneyNum(discountTotal)} грн`);
+    }
+  }
+
+  if (lang === 'ua') {
+    lines.push(`Разом: ${moneyNum(finalTotal)} грн`);
+    lines.push(`+50 грн/особа/год за квести (за бажанням)`);
+  } else {
+    lines.push(`Итого: ${moneyNum(finalTotal)} грн`);
+    lines.push(`+50 грн/час/чел за квесты (по желанию)`);
+  }
+
+  return lines.join('\n');
+}
+
+function generateMessages(ctx) {
+  const d         = formatDateUaRu(ctx.date);
+  const DATE_RU   = d.ru;
+  const DATE_UA   = d.ua;
+  const TIME_FROM = ctx.timeFrom;
+  const TIME_TO   = ctx.timeTo;
+  const PLAYERS   = ctx.players;
+  const PRICE     = Math.round(ctx.price);
+  const ADMIN     = ctx.admin || 'администратор';
+  const CLIENT_NAME = ctx.client || 'гость';
+  const DEPOSIT = Math.round(ctx.finalTotal * 0.5);
+
+  const msgType = msgTypeEl.value;
+
+  let ru = '';
+  let ua = '';
+
+  if (msgType === 'weekday') {
+    ru = `Здравствуйте, ${CLIENT_NAME} 👋
+
+Вы забронировали игровое время в клубе MirVR на:
+
+🔔 Дата: ${DATE_RU}
+⌛️ Время: ${TIME_FROM} – ${TIME_TO}
+🎮 Количество участников: ${PLAYERS}
+💰 Стоимость: ${PRICE} грн
+
++50 грн/час/чел доплата за квест, если вы выберете его на месте.
+
+Будем рады видеть вас за 5–10 минут до начала игрового времени.
+
+❗️ ВНИМАНИЕ ❗️
+* Если количество игроков уменьшится или сократится игровое время, оплата остаётся 100%, а остаток средств зачисляется на баланс игрового счёта.
+* Если игроки добавляются, пожалуйста, согласуйте это заранее, иначе может не быть свободных мест 😢
+
+С уважением, клуб виртуальной реальности MirVR, администратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Европейская, 89 (Екатерининская)
+🌐 https://mirvr.com.ua`;
+
+    ua = `Вітаємо, ${CLIENT_NAME} 👋
+
+Ви забронювали ігровий час у клубі MirVR на:
+
+🔔 Дата: ${DATE_UA}
+⌛️ Час: ${TIME_FROM} – ${TIME_TO}
+🎮 Кількість учасників: ${PLAYERS}
+💰 Вартість: ${PRICE} грн
+
++50 грн/год/люд доплата за квест, якщо ви оберете його на місці.
+
+Будемо раді бачити вас у гостях за 5–10 хвилин до початку ігрового часу.
+
+❗️ УВАГА ❗️
+* Якщо кількість гравців зменшиться або скоротиться ігровий час, оплата залишається 100%, а залишок коштів зараховується на баланс ігрового рахунку.
+* Якщо гравці додаються, погодьте, будь ласка, заздалегідь, інакше може не бути вільних місць 😢
+
+З повагою, клуб віртуальної реальності MirVR, адміністратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Європейська, 89 (Катерининська)
+🌐 https://mirvr.com.ua`;
+  } else if (msgType === 'weekend') {
+    ru = `Здравствуйте, ${CLIENT_NAME} 👋
+
+Вы забронировали игровое время в клубе MirVR на:
+
+🔔 Дата: ${DATE_RU}
+⌛️ Время: ${TIME_FROM} – ${TIME_TO}
+🎮 Количество участников: ${PLAYERS}
+💰 Стоимость: ${PRICE} грн
+
++50 грн/час/чел доплата за квест, если вы выберете его на месте.
+
+Будем рады видеть вас за 5–10 минут до начала игрового времени.
+
+Аванс 200 грн можно оплатить у нас в клубе, по номеру карты ниже или по ссылке (сумму нужно указать вручную):
+-----------------------
+4035200042439916
+
+Димитрова Яна Вячеславовна (Моно)
+
+https://pay.mbnk.biz/H3TxgYnnS2nX
+-----------------------
+❗️ ВНИМАНИЕ ❗️
+* Если количество игроков уменьшится или сократится игровое время, оплата остаётся 100%, а остаток средств зачисляется на баланс игрового счёта.
+* Если игроки добавляются, пожалуйста, согласуйте это заранее, иначе может не быть свободных мест 😢
+
+С уважением, клуб виртуальной реальности MirVR, администратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Европейская, 89 (Екатерининская)
+🌐 https://mirvr.com.ua`;
+
+    ua = `Вітаємо, ${CLIENT_NAME} 👋
+
+Ви забронювали ігровий час у клубі MirVR на:
+
+🔔 Дата: ${DATE_UA}
+⌛️ Час: ${TIME_FROM} – ${TIME_TO}
+🎮 Кількість учасників: ${PLAYERS}
+💰 Вартість: ${PRICE} грн
+
++50 грн/год/люд доплата за квест, якщо ви оберете його на місці.
+
+Будемо раді бачити вас у гостях за 5–10 хвилин до початку ігрового часу.
+
+Аванс 200 грн можна сплатити у нас у клубі, за номером картки нижче або за посиланням (суму потрібно вказати вручну):
+-----------------------
+4035200042439916
+
+Дімітрова Яна В'ячеславівна (Моно)
+
+https://pay.mbnk.biz/H3TxgYnnS2nX
+-----------------------
+❗️ УВАГА ❗️
+* Якщо кількість гравців зменшиться або скоротиться ігровий час, оплата залишається 100%, а залишок коштів зараховується на баланс ігрового рахунку.
+* Якщо гравці додаються, погодьте, будь ласка, заздалегідь, інакше може не бути вільних місць 😢
+
+З повагою, клуб віртуальної реальності MirVR, адміністратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Європейська, 89 (Катерининська)
+🌐 https://mirvr.com.ua`;
+  } else if (msgType === 'birthday') {
+    const TIMELINE_UA   = buildBirthdayTimeline(ctx.start, ctx.end, 'ua');
+    const TIMELINE_RU   = buildBirthdayTimeline(ctx.start, ctx.end, 'ru');
+    const CALC_UA       = buildBirthdayCalcBlock(ctx.start, ctx.end, ctx.players, ctx.isWeekday, ctx.discountTotal, ctx.finalTotal, 'ua');
+    const CALC_RU       = buildBirthdayCalcBlock(ctx.start, ctx.end, ctx.players, ctx.isWeekday, ctx.discountTotal, ctx.finalTotal, 'ru');
+
+    ua = `Вітаємо, ${CLIENT_NAME}! ☀️
+
+Клуб віртуальної реальності MirVR радий запропонувати Вам організацію 🥳 Дня народження 🥳
+
+Нижче наведені основні моменти проведення заходу. Якщо у Вас залишаться питання, з радістю обговоримо! 😊
+
+1️⃣ Зустріч гостей та банкет
+На збори та банкет зазвичай йде близько 30 хвилин, після чого діти з задоволенням переходять до ігор 🍕🎮.
+
+2️⃣ Ігровий час
+Стандартний ігровий час — 3 години. За цей час гості можуть пройти квести або пограти в командні та одиночні ігри. Але Ви можете забронювати як 2, так і 4 години ігор, на свій розсуд.
+
+3️⃣ Урочиста частина
+Після ігор — 30 хвилин на торт 🎂, привітання іменинника, піньяту та настільні ігри. Цього часу достатньо, щоб ніхто не почав нудьгувати.
+
+4️⃣ Індивідуальність
+Якщо хочете, щоб під час свята в клубі не було інших відвідувачів, потрібно забронювати всі ігрові консолі. В іншому випадку можуть бути інші гості клубу.
+
+5️⃣ Замовлення їжі
+То що робимо ми:
+
+https://mirvr.wayforpay.shop
+
+Наші партнери:
+https://delivery.pomodoro.od.ua/restaurants/4
+
+https://smilefood.od.ua
+
+Ви можете зробити замовлення самостійно за нашою адресою або надіслати нам скрін вибраних страв, і ми із задоволенням оформимо все за вас, щоб вам не довелося витрачати час на дзвінки з кур'єром 🥤🍴.
+
+6️⃣ Ігрові місця
+В клубі є 11 бездротових VR-гарнітур Oculus Quest 2 та 3 😃
+✅ 4 місця в першій залі
+✅ 4 місця в другій залі
+✅ 3 місця в третій залі
+✅ 2 VIP-кімнати PlayStation 5
+✅ PlayStation 4 PRO + VR + Just Dance
+Ігри запускаються в порядку черги під керівництвом адміністратора 🧍
+У нас Ви знайдете більше 100 ігор та 20 унікальних квестів 🤩
+
+7️⃣ Ціни
+✅ VR:
+- Будні дні з 11:00 до 18:00: 300 грн/год/особа
+- Після 18:00 та вихідні: 350 грн/год/особа
+✅ PlayStation (до 4 гравців):
+- Будні дні з 11:00 до 18:00: 300 грн/год
+- Після 18:00 та у вихідні: 350 грн/год
+✅ Квести +50 грн/особа/год.
+
+Настільні ігри та твістер — безкоштовно.
+При попередньому бронюванні даруємо знижку 50% на всі ігрові місця з третьої години, на честь свята.
+
+8️⃣ Форс-мажор
+Якщо кількість гостей змінюється, необхідно повідомити за 4 дні до заходу для перерахунку. Якщо гостей прийшло менше або стався форс-мажор, невикористана сума або аванс зараховуються на персональний рахунок в нашому клубі.
+Використати ці гроші може тільки одна особа протягом 6 місяців.
+
+9️⃣ Розрахунок та таймінг за Вашим запитом
+${DATE_UA}
+
+${TIMELINE_UA}
+
+Будь ласка, приходьте не раніше узгодженого часу, оскільки до цього в клубі може проходити інший захід і клуб буде зайнятий
+
+💰 Розрахунок:
+${CALC_UA}
+
+🔟 Аванс
+Для бронювання необхідно внести аванс — ${DEPOSIT} грн. Чим раніше, тим краще, оскільки місця можуть бути зайняті іншими клієнтами. Оплатити можна в клубі або за посиланням (відправимо окремо).
+
+❗️Аванс не повертається, але гарантує бронювання ігрових місць❗️
+
+ВІДГУКИ: https://g.page/r/CS-kLQe9DbDjEBM
+
+З повагою клуб віртуальної реальності MirVR, адміністратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Європейська, 89 (Катерининська)
+🌐 https://mirvr.com.ua/birthday`;
+
+    ru = `Здравствуйте, ${CLIENT_NAME}! ☀️
+
+Клуб виртуальной реальности MirVR рад предложить Вам организацию 🥳 Дня рождения 🥳
+
+Ниже представлены основные моменты проведения мероприятия. Если у Вас останутся вопросы, с радостью обсудим! 😊
+
+1️⃣ Встреча гостей и банкет
+На сборы и банкет обычно уходит около 30 минут, после чего дети с удовольствием переходят к играм 🍕🎮.
+
+2️⃣ Игровое время
+Стандартное игровое время — 3 часа. За это время гости могут пройти квесты или поиграть в командные и одиночные игры. Но Вы можете забронировать как 2, так и 4 часа игр, на своё усмотрение.
+
+3️⃣ Торжественная часть
+После игр — 30 минут на торт 🎂, поздравления именинника, пиньяту и настольные игры. Этого времени достаточно, чтобы никто не начал скучать.
+
+4️⃣ Индивидуальность
+Если вы хотите, чтобы во время праздника в клубе не было других посетителей, нужно забронировать все игровые консоли. В противном случае могут быть другие гости клуба.
+
+5️⃣ Заказ еды
+То, что делаем мы:
+
+https://mirvr.wayforpay.shop
+
+Наши партнёры:
+https://delivery.pomodoro.od.ua/restaurants/4
+
+https://smilefood.od.ua
+
+Вы можете сделать заказ самостоятельно по нашему адресу или прислать нам скриншот выбранных блюд, и мы с удовольствием оформим всё за вас, чтобы вам не приходилось тратить время на звонки с курьером 🥤🍴.
+
+6️⃣ Игровые места
+В клубе есть 11 беспроводных VR-гарнитур Oculus Quest 2 и 3 😃
+✅ 4 места в первом зале
+✅ 4 места во втором зале
+✅ 3 места в третьем зале
+✅ 2 VIP-комнаты PlayStation 5
+✅ PlayStation 4 PRO + VR + Just Dance
+Игры запускаются в порядке очереди под руководством администратора 🧍
+У нас Вы найдёте более 100 игр и 20 уникальных квестов 🤩
+
+7️⃣ Цены
+✅ VR:
+- Будние дни с 11:00 до 18:00: 300 грн/ч/чел
+- После 18:00 и выходные: 350 грн/ч/чел
+✅ PlayStation (до 4 игроков):
+- Будние дни с 11:00 до 18:00: 300 грн/ч
+- После 18:00 и в выходные: 350 грн/ч
+✅ Квесты +50 грн/чел/ч.
+
+Настольные игры и твистер — бесплатно.
+При предварительном бронировании дарим скидку 50% на все игровые места с третьего часа, в честь праздника.
+
+8️⃣ Форс-мажор
+Если количество гостей меняется, необходимо сообщить за 4 дня до мероприятия для перерасчёта. Если гостей пришло меньше или произошёл форс-мажор, неиспользованная сумма или аванс зачисляются на персональный счёт в нашем клубе.
+Воспользоваться этими деньгами может только одно лицо в течение 6 месяцев.
+
+9️⃣ Расчёт и тайминг по Вашему запросу
+${DATE_RU}
+
+${TIMELINE_RU}
+
+Пожалуйста, приходите не раньше согласованного времени, так как до этого в клубе может проходить другое мероприятие и клуб будет занят
+
+💰 Расчёт:
+${CALC_RU}
+
+🔟 Аванс
+Для бронирования необходимо внести аванс — ${DEPOSIT} грн. Чем раньше, тем лучше, так как места могут быть заняты другими клиентами. Оплатить можно в клубе или по ссылке (отправим отдельно).
+
+❗️Аванс не возвращается, но гарантирует бронирование игровых мест❗️
+
+ОТЗЫВЫ: https://g.page/r/CS-kLQe9DbDjEBM
+
+С уважением клуб виртуальной реальности MirVR, администратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Европейская, 89 (Екатерининская)
+🌐 https://mirvr.com.ua/birthday`;
+  }
+
+  if (msgType === 'quest') {
+    ru = `Здравствуйте, ${CLIENT_NAME} 👋
+
+Вы забронировали квест в виртуальной реальности на:
+
+🔔 Дата: ${DATE_RU}
+⌛️ Время: ${TIME_FROM} – ${TIME_TO}
+🎮 Количество участников: ${PLAYERS}
+💰 Стоимость: ${PRICE} грн
+
+Будем рады видеть вас за 5–10 минут до начала игрового времени.
+
+❗️ ВНИМАНИЕ ❗️
+* Если количество игроков уменьшится или сократится игровое время, оплата остаётся 100%, а остаток средств зачисляется на баланс игрового счёта.
+* Если игроки добавляются, пожалуйста, согласуйте это заранее, иначе может не быть свободных мест 😢
+
+С уважением, клуб виртуальной реальности MirVR, администратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Европейская, 89 (Екатерининская)
+🌐 https://mirvr.com.ua/quest`;
+
+    ua = `Вітаємо, ${CLIENT_NAME} 👋
+
+Ви забронювали квест у віртуальній реальності на:
+
+🔔 Дата: ${DATE_UA}
+⌛️ Час: ${TIME_FROM} – ${TIME_TO}
+🎮 Кількість учасників: ${PLAYERS}
+💰 Вартість: ${PRICE} грн
+
+Будемо раді бачити Вас у гостях за 5–10 хвилин до початку ігрового часу.
+
+❗️ УВАГА ❗️
+* Якщо кількість гравців зменшиться або скоротиться ігровий час, оплата залишається 100%, а залишок коштів зараховується на баланс ігрового рахунку.
+* Якщо гравці додаються, погодьте будь ласка заздалегідь, інакше може не бути вільних місць 😢
+
+З повагою клуб віртуальної реальності MirVR, адміністратор ${ADMIN} 😊
+-----------------------
+📞 093 942 34 70
+📍 Європейська, 89 (Катерининська)
+🌐 https://mirvr.com.ua/quest`;
+  }
+
+  msgRuEl.value = ru;
+  msgUaEl.value = ua;
+}
+
+document.getElementById('calcBtn').addEventListener('click', calc);
+[
+  gameDateEl,
+  startEl,
+  endEl,
+  placesEl,
+  msgTypeEl,
+  adminNameEl,
+  clientNameEl
+].forEach(el => el.addEventListener('input', calc));
+
+document.getElementById('copyMsgBtn').addEventListener('click', async () => {
+  try {
+    const txt = `${msgRuEl.value}\n\n---\n\n${msgUaEl.value}`;
+    await navigator.clipboard.writeText(txt);
+    const btn  = document.getElementById('copyMsgBtn');
+    const prev = btn.textContent;
+    btn.textContent = 'Скопировано';
+    setTimeout(() => (btn.textContent = prev), 1200);
+  } catch (e) {}
+});
+
+document.getElementById('themeBtn').addEventListener('click', () => {
+  const root = document.documentElement;
+  root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+});
+
+function getCleanPhone() {
+  const raw = document.getElementById('clientPhone').value.trim();
+  // Remove spaces, dashes, parentheses — keep + and digits
+  return raw.replace(/[\s\-()]/g, '');
+}
+
+document.getElementById('viberBtn').addEventListener('click', () => {
+  const phone = getCleanPhone();
+  if (!phone) {
+    alert('Введите номер телефона клиента');
+    return;
+  }
+  const digits = phone.replace(/\D/g, '');
+  window.open(`viber://chat?number=%2B${digits}`, '_blank');
+});
+
+document.getElementById('telegramBtn').addEventListener('click', () => {
+  const phone = getCleanPhone();
+  if (!phone) {
+    alert('Введите номер телефона клиента');
+    return;
+  }
+  const digits = phone.replace(/\D/g, '');
+  window.open(`https://t.me/+${digits}`, '_blank');
+});
+
+calc();
+
+// ========== BIRTHDAY EXTRAS ==========
+
+const EXTRA_OPTS_RU = `Также в нашем клубе можно приобрести ряд дополнительных опций для Вашего праздника:
+
+✅ Большая круглая фотозона — любой тематики, диаметр 2 м с индивидуальной надписью, например, имя ребёнка и сколько лет исполняется! Огромное количество шариков!! А в конце праздника можно будет весело лопать их зубочистками! Да, громко, но дууууже весело! (конечно, по желанию)
+от 4000 грн
+
+✅ Мини-фотозона — круглое кольцо на ножке высотой 1,2 метра с шариками, надписью «Happy Birthday» и неоновой подсветкой — добавит праздничного настроения вашим фото.
+от 800 грн
+
+✅ Оформление зала — набор из гелиевых шариков и метровых фольгированных цифр обязательно создадут атмосферу праздника 🎈 Цвета шариков на ваше усмотрение, цифры — золото или серебро.
+1800 грн
+
+✅ Праздничная пиньята — любой тематики и формы с базовым наполнением: конфетти и маленькие воздушные шарики. Делается на заказ по вашему фото из интернета :)
+от 1100 грн
+
+✅ Наполнение для пиньяты — набор конфет-ассорти (шоколадные, желейные и карамель) от компании «Roshen» и 10 пакетиков для сбора конфет ;)
+700 грн
+
+✅ Праздничный торт — ну дууууже вкусные торты от лучшего кондитера с тонной положительных отзывов. Более 100 наших именинников уже оценили ;) Дизайн повторяется по вашему фото из интернета. Вам нужно лишь захватить свечи, остальное — сделаем мы сами!
+от 1500 до 2100 грн за кг с учётом доставки и дизайна 👌
+
+✅ Праздничная сервировка — керамические белые тарелочки, приборы и стаканы, большие фиолетовые салфетки (в тон нашему интерьеру) для праздничного настроения. Услуга позволит сэкономить силы и сохранить праздничное настроение без забот об уборке и одноразовой посуде.
+Что входит в стоимость?
+• Первая сервировка для банкета
+• Помощь в расстановке еды и напитков
+• Первая уборка
+• Сервировка стола для торта
+• Уборка после праздника
+• Одноразовые боксы для гостей, которые захотят взять торт с собой
+90 грн за человека
+
+✅ Детский профессиональный фотограф — мы перепробовали разные варианты за вас и нашли идеальный! Более 300!!!! фото отличного качества с эмоциями на память о празднике ;)
+2500 грн
+
+✅ Видеоролик «Happy Birthday» — профессиональный видеограф запечатлеет самые яркие и трогательные моменты праздника, а ваш ребёнок почувствует себя настоящим главным героем в собственном фильме. Вы получите трёхминутное видео с ключевыми моментами праздника + готовые ролики для социальных сетей (форматы Stories и Reels).
+6000 грн
+
+✅ Настольные игры — наш ведущий подберёт игры, которые идеально подходят для возраста детей, и проведёт весёлую игротеку, где каждый найдёт что-то интересное. Это время увлекательного живого общения, смеха и командных побед!
+1000 грн/час
+
+✅ Аниматор — это весёлый, энергичный и креативный человек, который создаст незабываемую атмосферу для именинника и его гостей. От 3500 грн/час
+
+✅ Приглашения — можно забрать в клубе в любое удобное время :)
+15 грн/шт
+
+Все украшения можно выполнить в едином стиле, чтобы праздник стал тематическим.
+
+🤩 БУДЕТ ДУУУУЖЕ КРАСИВО 🎈
+
+Посмотреть некоторые варианты оформлений можно по ссылке ниже:
+https://mirvrbirthday.wayforpay.shop/`;
+
+const EXTRA_OPTS_UA = `Також у нашому клубі можна придбати ряд додаткових опцій для Вашого свята:
+
+✅ Велика кругла фотозона - будь-якої тематики, діаметр 2 м з індивідуальним написом, наприклад, ім’я дитини та скільки років виповнюється! Велезезна кількість кульок!! А в кінці свята можна буде весело їх лускати зубочистками! Так, гучно, але дуууже весело! (звісно, за бажанням)
+від 4000 грн
+
+✅ Міні-фотозона - кругле кільце на ніжці висотою 1,2 метра з кульками, написом “Happy Birthday” та неоновим підсвічуванням - додасть святкового настрою вашим фото.
+від 800 грн
+
+✅ Оформлення залу - набір із гелієвих кульок та метрових фольгованих цифр обов’язково створять атмосферу свята 🎈 Кольори кульок на ваш розсуд, цифри - золото або срібло.
+1800 грн
+
+✅ Святкова піньята - будь-якої тематики та форми з базовим наповненням: конфетті та маленькі повітряні кульки. Робиться на замовлення за вашим фото з інтернету :)
+від 1100 грн
+
+✅ Наповнення для піньяти - набір цукерок-асорті (шоколадні, желейні та карамель) від компанії “Roshen” і 10 пакетиків для збору цукерок ;)
+700 грн
+
+✅ Святковий торт - ну дуууже смачні торти від найкращого кондитера з тонною позитивних відгуків. Більше 100 наших іменинників вже оцінили ;) Дизайн повторюється за вашим фото з інтернету. Вам потрібно лише захопити свічки, решту - зробимо ми самі!
+від 1500 до 2100 грн за кг з урахуванням доставки та дизайну 👌
+
+✅ Святкова сервіровка - керамічні білі тарілочки, прибори та склянки, великі фіолетові серветки (у тон нашому інтер’єру) для святкового настрою. Послуга дозволить зекономити сили та зберегти святковий настрій без турбот про прибирання та одноразовий посуд.
+Що входить у вартість?
+• Перша сервіровка для банкету
+• Допомога у розстановці їжі та напоїв
+• Перше прибирання
+• Сервірування столу для торта
+• Прибирання після свята
+• Одноразові бокси для гостей, які захочуть взяти торт із собою
+90 грн за людину
+
+✅ Дитячий професійний фотограф - ми перепробували різні варіанти за вас і знайшли ідеальний! Більше 300!!!! фото чудової якості з емоціями на згадку про свято ;)
+2500 грн
+
+✅ Відеоролик “Happy Birthday” - професійний відеограф зафіксує найяскравіші та найзворушливіші моменти свята, а ваша дитина відчує себе справжнім головним героєм у власному фільмі. Ви отримаєте трьоххвилинне відео з ключовими моментами свята + готові ролики для соціальних мереж (формати Stories і Reels).
+6000 грн
+
+✅ Настільні ігри - наш ведучий підбере ігри, які ідеально підходять для віку дітей, та проведе веселу ігротеку, де кожен знайде щось цікаве. Це час захоплюючого живого спілкування, сміху та командних перемог!
+1000 грн/год
+
+✅ Аніматор - це весела, енергійна та креативна людина, яка створить незабутню атмосферу для іменинника та його гостей. Від 3500 грн/год
+
+✅ Запрошення - можна забрати у клубі в будь-який зручний час :)
+15 грн/шт
+
+Усі прикраси можна виконати в єдиному стилі, щоб свято стало тематичним.
+
+🤩 БУДЕ ДУУУЖЕ КРАСИВО 🎈
+
+Подивитися деякими варіантами оформлень можна за посиланням нижче:
+https://mirvrbirthday.wayforpay.shop/`;
+
+const EXTRA_REQ_RU = `Реквизиты для внесения оплаты:
+📄 Номер карты:
+
+4035200042439916
+
+🏦 Получатель:
+Димитрова Яна Вячеславна (Monobank)`;
+
+const EXTRA_REQ_UA = `Реквізити для внесення оплати:
+📄 Номер картки:
+
+4035200042439916
+
+🏦 Одержувач:
+Дімітрова Яна В'ячеславівна (Monobank)`;
+
+function fillExtras() {
+  document.getElementById('extraOptsRu').value = EXTRA_OPTS_RU;
+  document.getElementById('extraOptsUa').value = EXTRA_OPTS_UA;
+  document.getElementById('extraReqRu').value  = EXTRA_REQ_RU;
+  document.getElementById('extraReqUa').value  = EXTRA_REQ_UA;
+}
+
+function copyExtra(id) {
+  const el = document.getElementById(id);
+  navigator.clipboard.writeText(el.value).then(() => {
+    const btns = el.previousElementSibling ? el.previousElementSibling.querySelectorAll('button') : [];
+  }).catch(() => {
+    el.select();
+    document.execCommand('copy');
+  });
+}
+
+function openFile(path) {
+  window.open(path, '_blank');
+}
+
+// Show/hide birthday extras block
+msgTypeEl.addEventListener('change', () => {
+  const show = msgTypeEl.value === 'birthday';
+  document.getElementById('bdayExtras').style.display = show ? 'block' : 'none';
+});
+
+fillExtras();
+</script>
+</body>
+</html>
