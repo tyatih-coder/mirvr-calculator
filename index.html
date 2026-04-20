@@ -576,6 +576,7 @@ function calc() {
     baseTotal,
     finalTotal,
     discountTotal,
+    discountLine,
     dayType: dayType.short,
     isWeekday: dayType.isWeekday,
     detail,
@@ -642,7 +643,7 @@ function buildBirthdayTimeline(startMin, endMin, lang) {
 }
 
 // Build birthday calculation block (UA or RU)
-function buildBirthdayCalcBlock(startMin, endMin, places, isWeekday, discountTotal, finalTotal, lang) {
+function buildBirthdayCalcBlock(startMin, endMin, places, isWeekday, discountTotal, finalTotal, lang, discountLine) {
   const totalMinutes = endMin - startMin;
   const BANQUET1_MIN = 30;
   const BANQUET2_MIN = 30;
@@ -715,9 +716,15 @@ function buildBirthdayCalcBlock(startMin, endMin, places, isWeekday, discountTot
 
   if (discountTotal > 0) {
     if (lang === 'ua') {
-      lines.push(`Знижка з 3-ї години (50%): –${moneyNum(discountTotal)} грн`);
+      // Translate discountLine to UA
+      let uaLine = discountLine
+        .replace('Скидка начиная с 3-го часа (50%):', 'Знижка з 3-ї години (50%):')
+        .replace('Скидка для 1 игрока (50%):', 'Знижка іменинникові (50%):');
+      lines.push(`${uaLine}`);
     } else {
-      lines.push(`Скидка с 3-го часа (50%): –${moneyNum(discountTotal)} грн`);
+      let ruLine = discountLine
+        .replace('Скидка для 1 игрока (50%):', 'Скидка имениннику (50%):');
+      lines.push(`${ruLine}`);
     }
   }
 
@@ -860,8 +867,8 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
   } else if (msgType === 'birthday') {
     const TIMELINE_UA   = buildBirthdayTimeline(ctx.start, ctx.end, 'ua');
     const TIMELINE_RU   = buildBirthdayTimeline(ctx.start, ctx.end, 'ru');
-    const CALC_UA       = buildBirthdayCalcBlock(ctx.start, ctx.end, ctx.players, ctx.isWeekday, ctx.discountTotal, ctx.finalTotal, 'ua');
-    const CALC_RU       = buildBirthdayCalcBlock(ctx.start, ctx.end, ctx.players, ctx.isWeekday, ctx.discountTotal, ctx.finalTotal, 'ru');
+    const CALC_UA       = buildBirthdayCalcBlock(ctx.start, ctx.end, ctx.players, ctx.isWeekday, ctx.discountTotal, ctx.finalTotal, 'ua', ctx.discountLine || '');
+    const CALC_RU       = buildBirthdayCalcBlock(ctx.start, ctx.end, ctx.players, ctx.isWeekday, ctx.discountTotal, ctx.finalTotal, 'ru', ctx.discountLine || '');
 
     ua = `Вітаємо, ${CLIENT_NAME}! ☀️
 
@@ -911,7 +918,7 @@ https://delivery.pomodoro.od.ua/restaurants/4
 ✅ Квести +50 грн/особа/год.
 
 Настільні ігри та твістер — безкоштовно.
-При попередньому бронюванні даруємо знижку 50% на всі ігрові місця з третьої години, на честь свята.
+${ctx.discountTotal > 0 && ctx.discountLine && ctx.discountLine.includes('1 игрока') ? 'При попередньому бронюванні даруємо знижку 50% іменинникові, на честь свята.' : 'При попередньому бронюванні даруємо знижку 50% на всі ігрові місця з третьої години, на честь свята.'}
 
 8️⃣ Форс-мажор
 Якщо кількість гостей змінюється, необхідно повідомити за 4 дні до заходу для перерахунку. Якщо гостей прийшло менше або стався форс-мажор, невикористана сума або аванс зараховуються на персональний рахунок в нашому клубі.
@@ -988,7 +995,7 @@ https://delivery.pomodoro.od.ua/restaurants/4
 ✅ Квесты +50 грн/чел/ч.
 
 Настольные игры и твистер — бесплатно.
-При предварительном бронировании дарим скидку 50% на все игровые места с третьего часа, в честь праздника.
+${ctx.discountTotal > 0 && ctx.discountLine && ctx.discountLine.includes('1 игрока') ? 'При предварительном бронировании дарим скидку 50% имениннику, в честь праздника.' : 'При предварительном бронировании дарим скидку 50% на все игровые места с третьего часа, в честь праздника.'}
 
 8️⃣ Форс-мажор
 Если количество гостей меняется, необходимо сообщить за 4 дня до мероприятия для перерасчёта. Если гостей пришло меньше или произошёл форс-мажор, неиспользованная сумма или аванс зачисляются на персональный счёт в нашем клубе.
