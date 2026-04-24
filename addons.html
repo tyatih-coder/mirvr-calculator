@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MirVR — Допи до ДР</title>
+  <style>
+    :root {
+      --bg: #f4f6fa; --card: #ffffff; --text: #1a1a2e; --muted: #6b7280;
+      --primary: #6c47ff; --primary-2: #ede9ff; --border: #e2e8f0;
+      --green: #16a34a; --radius: 14px;
+    }
+    [data-theme="dark"] {
+      --bg: #0f0f1a; --card: #1a1a2e; --text: #f1f5f9; --muted: #94a3b8;
+      --primary-2: #2d2460; --border: #2e2e4a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 15px; min-height: 100vh; }
+    .topbar { background: var(--card); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
+    .topbar h1 { font-size: 17px; font-weight: 700; }
+    .topbar a { font-size: 13px; color: var(--primary); text-decoration: none; }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px 60px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+    .card h2 { font-size: 15px; font-weight: 700; margin-bottom: 14px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .field { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 160px; }
+    .field label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .field input { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: var(--text); font-size: 15px; outline: none; width: 100%; }
+    .field input:focus { border-color: var(--primary); }
+    .field .hint { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .section-title { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 18px 0 8px; }
+    .addons-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+    .addon-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; transition: border-color .15s, background .15s; }
+    .addon-item:hover { border-color: var(--primary); background: var(--primary-2); }
+    .addon-item input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--primary); margin-top: 2px; flex-shrink: 0; cursor: pointer; }
+    .addon-item .addon-label { font-size: 14px; line-height: 1.4; }
+    .addon-item .addon-price { font-size: 12px; color: var(--muted); }
+    .addon-item.checked { border-color: var(--green); background: #f0fdf4; }
+    [data-theme="dark"] .addon-item.checked { background: #052e16; }
+    .extra-row { display: none; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; padding: 8px 12px; background: var(--bg); border-radius: 8px; border: 1px solid var(--border); }
+    .extra-row.visible { display: flex; }
+    .extra-row label { font-size: 13px; color: var(--muted); }
+    .extra-row input { background: var(--card); border: 1px solid var(--border); border-radius: 7px; padding: 6px 10px; color: var(--text); font-size: 14px; outline: none; }
+    .extra-row input:focus { border-color: var(--primary); }
+    .extra-row input.narrow { width: 80px; }
+    .extra-row input.medium { width: 120px; }
+    .extra-row .calc-result { font-weight: 700; font-size: 14px; color: var(--primary); }
+    .total-box { background: var(--primary-2); border: 1px solid var(--primary); border-radius: 10px; padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; }
+    .t-item { font-size: 14px; }
+    .t-item strong { font-size: 16px; }
+    .t-pay { font-size: 18px; font-weight: 700; color: var(--primary); }
+    .btn { padding: 10px 20px; border-radius: 9px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+    .btn:hover { opacity: .85; }
+    .btn.primary { background: var(--primary); color: #fff; }
+    .btn.secondary { background: var(--primary-2); color: var(--text); border: 1px solid var(--border); }
+    .msg-block { margin-top: 14px; }
+    .msg-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .msg-header h3 { font-size: 14px; font-weight: 700; }
+    textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 13px; font-family: inherit; resize: vertical; outline: none; line-height: 1.6; }
+    .theme-btn { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 14px; color: var(--text); }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>🎂 MirVR — Допи до Дня народження</h1>
+  <div style="display:flex;gap:10px;align-items:center">
+    <button class="theme-btn" id="themeBtn">🌙</button>
+    <a href="index.html">← Калькулятор</a>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- Основні дані -->
+  <div class="card">
+    <h2>📋 Основні дані</h2>
+    <div class="row">
+      <div class="field">
+        <label>Ім'я клієнта</label>
+        <input id="clientName" type="text" placeholder="Наприклад: Оля" />
+      </div>
+      <div class="field">
+        <label>Вартість VR (грн)</label>
+        <input id="vrCost" type="number" min="0" step="1" placeholder="0" />
+        <span class="hint">⚠️ Якщо є квест — доплата рахується окремо на місці</span>
+      </div>
+      <div class="field">
+        <label>Аванс сплачено (грн)</label>
+        <input id="advance" type="number" min="0" step="1" placeholder="0" />
+      </div>
+      <div class="field">
+        <label>Кількість гостей</label>
+        <input id="guestCount" type="number" min="1" step="1" placeholder="1" value="1" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Додаткові опції -->
+  <div class="card">
+    <h2>✨ Додаткові опції</h2>
+
+    <div class="section-title">🎨 Декор</div>
+    <div class="addons-grid">
+
+      <label class="addon-item">
+        <input type="checkbox" class="addon-cb" id="cb-decor1"
+          data-name-ua="Набір прикрас #1" data-name-ru="Набор украшений #1" data-price="1800">
+        <div><div class="addon-label">Набір прикрас #1</div><div class="addon-price">1 800 грн</div></div>
+      </label>
+
+      <label class="addon-item">
+        <input type="checkbox" class="addon-cb" id="cb-photoz"
+          data-name-ua="Фотозона" data-name-ru="Фотозона" data-price="custom">
+        <div><div class="addon-label">Фотозона (глянцева/тематична)</div><div class="addon-price">ціна за домовленістю</div></div>
+      </label>
+
+      <label class="addon-item">
+        <input type="checkbox" class="addon-cb" id="cb-serv"
+          data-name-ua="Святкове сервірування" data-name-ru="Праздничная сервировка" data-price="auto-serv">
+        <div><div class="addon-label">Святкове сервірування</div><div class="addon-price">90 грн/особа</div></div>
+      </label>
+
+    </div>
+
+    <!-- Поле фотозони -->
+    <div class="extra-row" id="row-photoz">
+      <label>Сума:</label>
+      <input type="number" class="medium" id="photoz-price" min="0" placeholder="6000" />
+      <span>грн</span>
+    </div>
+
+    <!-- Поле сервировки — считается по кол-ву гостей -->
+    <div class="extra-row" id="row-serv">
+      <label>Гостей:</label>
+      <input type="number" class="narrow" id="serv-qty" min="1" value="1" />
+      <span>× 90 грн =</span>
+      <span class="calc-result" id="serv-total">90 грн</span>
+    </div>
+
+    <div class="section-title">🎉 Розваги</div>
+    <div class="addons-grid">
+      <label class="addon-item"><input type="checkbox" class="addon-cb" data-name-ua="Аніматор" data-name-ru="Аниматор" data-price="3500"><div><div class="addon-label">Аніматор</div><div class="addon-price">3 500 грн/год</div></div></label>
+      <label class="addon-item"><input type="checkbox" class="addon-cb" data-name-ua="Ведучий настільних ігор" data-name-ru="Ведущий настольных игр" data-price="1000"><div><div class="addon-label">Ведучий настільних ігор</div><div class="addon-price">1 000 грн/год</div></div></label>
+      <label class="addon-item"><input type="checkbox" class="addon-cb" data-name-ua="Святкова піньята" data-name-ru="Праздничная пиньята" data-price="1100"><div><div class="addon-label">Святкова піньята</div><div class="addon-price">1 100 грн</div></div></label>
+      <label class="addon-item"><input type="checkbox" class="addon-cb" data-name-ua="Наповнення до піньяти" data-name-ru="Наполнение пиньяты" data-price="700"><div><div class="addon-label">Наповнення до піньяти</div><div class="addon-price">700 грн</div></div></label>
+      <label class="addon-item"><input type="checkbox" class="addon-cb" data-name-ua="Неонові святкові аксесуари" data-name-ru="Неоновые праздничные аксессуары" data-price="400"><div><div class="addon-label">Неонові святкові аксесуари</div><div class="addon-price">400 грн</div></div></label>
+    </div>
+
+    <div class="section-title">📸 Фото/відео</div>
+    <div class="addons-grid">
+      <label class="addon-item"><input type="checkbox" class="addon-cb" data-name-ua="Професійний дитячий фотограф" data-name-ru="Профессиональный детский фотограф" data-price="2500"><div><div class="addon-label">Дитячий фотограф</div><div class="addon-price">2 500 грн/год</div></div></label>
+      <label class="addon-item"><input type="checkbox" class="addon-cb" data-name-ua="Професійний відеограф" data-name-ru="Профессиональный видеограф" data-price="6000"><div><div class="addon-label">Відеограф</div><div class="addon-price">6 000 грн/год</div></div></label>
+    </div>
+
+    <div class="section-title">🎂 Їжа та напої</div>
+    <div class="addons-grid">
+
+      <label class="addon-item">
+        <input type="checkbox" class="addon-cb" id="cb-cake"
+          data-name-ua="Святковий тортик" data-name-ru="Праздничный тортик" data-price="custom">
+        <div><div class="addon-label">Святковий тортик</div><div class="addon-price">від 1 800 грн/кг (ціна вручну)</div></div>
+      </label>
+
+      <label class="addon-item">
+        <input type="checkbox" class="addon-cb" id="cb-drinks"
+          data-name-ua="Напої на барі" data-name-ru="Напитки на баре" data-price="custom">
+        <div><div class="addon-label">Напої на барі 🍹</div><div class="addon-price">ціна вручну</div></div>
+      </label>
+
+      <label class="addon-item">
+        <input type="checkbox" class="addon-cb" id="cb-pomidoro"
+          data-name-ua="Доставка їжі (Помодоро)" data-name-ru="Доставка еды (Помодоро)" data-price="custom">
+        <div><div class="addon-label">Доставка їжі Помодоро 🍕</div><div class="addon-price">ціна вручну</div></div>
+      </label>
+
+    </div>
+
+    <!-- Поле торта -->
+    <div class="extra-row" id="row-cake">
+      <label>Сума за тортик:</label>
+      <input type="number" class="medium" id="cake-price" min="0" placeholder="1800" />
+      <span>грн</span>
+    </div>
+
+    <!-- Поле напитков -->
+    <div class="extra-row" id="row-drinks">
+      <label>Кількість:</label>
+      <input type="number" class="narrow" id="drinks-qty" min="1" value="1" />
+      <span>× ціна:</span>
+      <input type="number" class="narrow" id="drinks-price" min="0" value="120" />
+      <span>грн =</span>
+      <span class="calc-result" id="drinks-total">120 грн</span>
+    </div>
+
+    <!-- Поле Помодоро -->
+    <div class="extra-row" id="row-pomidoro">
+      <label>Сума за доставку:</label>
+      <input type="number" class="medium" id="pomidoro-price" min="0" placeholder="0" />
+      <span>грн</span>
+    </div>
+
+  </div>
+
+  <!-- Итог -->
+  <div class="card">
+    <h2>💰 Підсумок</h2>
+    <div class="total-box">
+      <div class="t-item">🎮 VR: <strong id="t-vr">0 грн</strong></div>
+      <div class="t-item">🎁 Допи: <strong id="t-addons">0 грн</strong></div>
+      <div class="t-item">💰 Разом: <strong id="t-total">0 грн</strong></div>
+      <div class="t-item">✅ Аванс: <strong id="t-advance">0 грн</strong></div>
+      <div class="t-pay">🔥 Доплата: <span id="t-pay">0 грн</span></div>
+    </div>
+  </div>
+
+  <!-- Сообщения -->
+  <div class="card">
+    <h2>📨 Повідомлення для клієнта</h2>
+    <button class="btn primary" id="genBtn" style="margin-bottom:16px">Згенерувати повідомлення</button>
+
+    <div class="msg-block">
+      <div class="msg-header">
+        <h3>🇺🇦 UA</h3>
+        <button class="btn secondary" onclick="copyMsg('msgUa', this)">Скопіювати UA</button>
+      </div>
+      <textarea id="msgUa" rows="24" readonly></textarea>
+    </div>
+
+    <div class="msg-block">
+      <div class="msg-header">
+        <h3>🇷🇺 RU</h3>
+        <button class="btn secondary" onclick="copyMsg('msgRu', this)">Скопировать RU</button>
+      </div>
+      <textarea id="msgRu" rows="24" readonly></textarea>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const fmt = n => Math.round(n).toLocaleString('uk-UA');
+
+// --- Цены ---
+function getPrice(cb) {
+  const id = cb.id;
+  if (!cb.checked) return 0;
+  const dp = cb.dataset.price;
+  if (dp === 'auto-serv') {
+    return (parseInt(document.getElementById('serv-qty').value) || 0) * 90;
+  }
+  if (id === 'cb-photoz') return parseInt(document.getElementById('photoz-price').value) || 0;
+  if (id === 'cb-cake')   return parseInt(document.getElementById('cake-price').value) || 0;
+  if (id === 'cb-drinks') {
+    const q = parseInt(document.getElementById('drinks-qty').value) || 0;
+    const p = parseInt(document.getElementById('drinks-price').value) || 0;
+    return q * p;
+  }
+  if (id === 'cb-pomidoro') return parseInt(document.getElementById('pomidoro-price').value) || 0;
+  return parseInt(dp) || 0;
+}
+
+function calcAddons() {
+  return [...document.querySelectorAll('.addon-cb')].reduce((s, cb) => s + getPrice(cb), 0);
+}
+
+function updateTotals() {
+  // Синхронизируем кол-во гостей с сервировкой
+  const guests = parseInt(document.getElementById('guestCount').value) || 1;
+  const servQtyEl = document.getElementById('serv-qty');
+  servQtyEl.value = guests;
+  document.getElementById('serv-total').textContent = fmt(guests * 90) + ' грн';
+
+  // Напитки
+  const dQ = parseInt(document.getElementById('drinks-qty').value) || 0;
+  const dP = parseInt(document.getElementById('drinks-price').value) || 0;
+  document.getElementById('drinks-total').textContent = fmt(dQ * dP) + ' грн';
+
+  const vr   = parseInt(document.getElementById('vrCost').value) || 0;
+  const adv  = parseInt(document.getElementById('advance').value) || 0;
+  const adds = calcAddons();
+  const total = vr + adds;
+  const pay   = Math.max(0, total - adv);
+
+  document.getElementById('t-vr').textContent      = fmt(vr)    + ' грн';
+  document.getElementById('t-addons').textContent  = fmt(adds)  + ' грн';
+  document.getElementById('t-total').textContent   = fmt(total) + ' грн';
+  document.getElementById('t-advance').textContent = fmt(adv)   + ' грн';
+  document.getElementById('t-pay').textContent     = fmt(pay)   + ' грн';
+}
+
+// --- Toggle extra rows ---
+function toggleRow(cbId, rowId) {
+  const cb  = document.getElementById(cbId);
+  const row = document.getElementById(rowId);
+  if (!cb || !row) return;
+  cb.addEventListener('change', () => {
+    row.classList.toggle('visible', cb.checked);
+    updateTotals();
+  });
+}
+toggleRow('cb-photoz',   'row-photoz');
+toggleRow('cb-serv',     'row-serv');
+toggleRow('cb-cake',     'row-cake');
+toggleRow('cb-drinks',   'row-drinks');
+toggleRow('cb-pomidoro', 'row-pomidoro');
+
+// --- Визуальный стиль чекбоксов ---
+document.querySelectorAll('.addon-cb').forEach(cb => {
+  cb.addEventListener('change', function () {
+    this.closest('.addon-item').classList.toggle('checked', this.checked);
+    updateTotals();
+  });
+});
+
+// Все инпуты
+document.querySelectorAll('input').forEach(el => el.addEventListener('input', updateTotals));
+
+// --- Генерация ---
+document.getElementById('genBtn').addEventListener('click', () => {
+  const name  = document.getElementById('clientName').value.trim() || 'друже';
+  const vr    = parseInt(document.getElementById('vrCost').value) || 0;
+  const adv   = parseInt(document.getElementById('advance').value) || 0;
+  const adds  = calcAddons();
+  const total = vr + adds;
+  const pay   = Math.max(0, total - adv);
+
+  const allCbs = [...document.querySelectorAll('.addon-cb')];
+
+  // Категории
+  const CATS = [
+    { key: 'decor',  ua: '🎨 Декор:',         ru: '🎨 Декор:',          ids: ['cb-decor1','cb-photoz','cb-serv'] },
+    { key: 'fun',    ua: '🎉 Розваги:',        ru: '🎉 Развлечения:',    ids: null, names_ua: ['Аніматор','Ведучий настільних ігор','Святкова піньята','Наповнення до піньяти','Неонові святкові аксесуари'] },
+    { key: 'photo',  ua: '📸 Фото/відео:',     ru: '📸 Фото/видео:',     ids: null, names_ua: ['Професійний дитячий фотограф','Професійний відеограф'] },
+    { key: 'food',   ua: '🎂 Їжа та напої:',   ru: '🎂 Еда и напитки:',  ids: ['cb-cake','cb-drinks','cb-pomidoro'] },
+  ];
+
+  function lineForCb(cb, lang, checked) {
+    const marker = checked ? '✅' : '◻️';
+    const nameUa = cb.dataset.nameUa;
+    const nameRu = cb.dataset.nameRu;
+    const name   = lang === 'ua' ? nameUa : nameRu;
+    const id     = cb.id;
+    const dp     = cb.dataset.price;
+
+    if (checked) {
+      const price = getPrice(cb);
+      if (id === 'cb-serv') {
+        const qty = parseInt(document.getElementById('serv-qty').value) || 1;
+        return lang === 'ua'
+          ? `— ${marker} ${name} (${qty} осіб × 90 грн) — ${fmt(qty*90)} грн`
+          : `— ${marker} ${name} (${qty} чел. × 90 грн) — ${fmt(qty*90)} грн`;
+      }
+      if (id === 'cb-drinks') {
+        const q = parseInt(document.getElementById('drinks-qty').value)||0;
+        const p = parseInt(document.getElementById('drinks-price').value)||0;
+        return `— ${marker} ${name} 🍹 (${q} шт × ${p} грн) — ${fmt(q*p)} грн`;
+      }
+      if (price === 0) {
+        return lang === 'ua'
+          ? `— ${marker} ${name} — за домовленістю`
+          : `— ${marker} ${name} — по договорённости`;
+      }
+      return `— ${marker} ${name} — ${fmt(price)} грн`;
+    } else {
+      // невыбранный
+      if (id === 'cb-serv')     return lang==='ua' ? `— ${marker} ${name} — 90 грн/особа`         : `— ${marker} ${name} — 90 грн/чел.`;
+      if (id === 'cb-cake')     return lang==='ua' ? `— ${marker} ${name} — від 1 800 грн/кг`      : `— ${marker} ${name} — от 1 800 грн/кг`;
+      if (id === 'cb-drinks')   return lang==='ua' ? `— ${marker} ${name} 🍹 — за домовленістю`    : `— ${marker} ${name} 🍹 — по договорённости`;
+      if (id === 'cb-pomidoro') return lang==='ua' ? `— ${marker} ${name} 🍕 — за домовленістю (https://delivery.pomodoro.od.ua/restaurants/4)` : `— ${marker} ${name} 🍕 — по договорённости (https://delivery.pomodoro.od.ua/restaurants/4)`;
+      if (id === 'cb-photoz')   return lang==='ua' ? `— ${marker} ${name} — за домовленістю`       : `— ${marker} ${name} — по договорённости`;
+      const p = parseInt(dp)||0;
+      return p > 0 ? `— ${marker} ${name} — ${fmt(p)} грн` : (lang==='ua' ? `— ${marker} ${name} — за домовленістю` : `— ${marker} ${name} — по договорённости`);
+    }
+  }
+
+  function buildBlock(lang) {
+    let block = '';
+    CATS.forEach(cat => {
+      const cbs = cat.ids
+        ? cat.ids.map(id => document.getElementById(id)).filter(Boolean)
+        : allCbs.filter(cb => cat.names_ua.includes(cb.dataset.nameUa));
+
+      const checkedLines   = cbs.filter(cb=>cb.checked).map(cb=>lineForCb(cb,lang,true));
+      const uncheckedLines = cbs.filter(cb=>!cb.checked).map(cb=>lineForCb(cb,lang,false));
+      const all = [...checkedLines, ...uncheckedLines];
+      if (all.length) block += `\n${lang==='ua'?cat.ua:cat.ru}\n${all.join('\n')}`;
+    });
+    return block;
+  }
+
+  const hasChosen = allCbs.some(cb => cb.checked);
+
+  function buildMsg(lang) {
+    const n   = lang==='ua' ? name : name;
+    const vrL = lang==='ua' ? 'VR-ігри' : 'VR-игры';
+    const questNote = lang==='ua'
+      ? '⚠️ Якщо є квест — доплата за нього розраховується окремо на місці'
+      : '⚠️ Если есть квест — доплата за него рассчитывается отдельно на месте';
+
+    let body = '';
+    if (hasChosen) {
+      const chosenCbs   = allCbs.filter(cb=>cb.checked);
+      const uncheckedCbs = allCbs.filter(cb=>!cb.checked);
+      const chosenLines  = chosenCbs.map(cb=>lineForCb(cb,lang,true));
+
+      body = lang==='ua'
+        ? `🎁 Ви вже обрали:\n${chosenLines.join('\n')}\n\n💰 Загальна сума: ${fmt(total)} грн\n✅ Аванс сплачено: ${fmt(adv)} грн\n🔥 Доплата в клубі: ${fmt(pay)} грн`
+        : `🎁 Вы уже выбрали:\n${chosenLines.join('\n')}\n\n💰 Общая сумма: ${fmt(total)} грн\n✅ Аванс оплачен: ${fmt(adv)} грн\n🔥 Доплата в клубе: ${fmt(pay)} грн`;
+
+      if (uncheckedCbs.length > 0) {
+        const availBlock = buildBlock(lang);
+        const detailLink = lang==='ua'
+          ? `\nДетальніше: https://mirvr.wayforpay.shop/`
+          : `\nПодробнее: https://mirvr.wayforpay.shop/`;
+        const addLabel = lang==='ua' ? '\n➕ Також можемо додати до свята:' : '\n➕ Также можем добавить к празднику:';
+        body += addLabel + availBlock + detailLink;
+      }
+    } else {
+      body = lang==='ua'
+        ? `💳 Аванс сплачено: ${fmt(adv)} грн\n🔥 Доплата в клубі: ${fmt(pay)} грн`
+        : `💳 Аванс оплачен: ${fmt(adv)} грн\n🔥 Доплата в клубе: ${fmt(pay)} грн`;
+      const availBlock = buildBlock(lang);
+      const detailLink = lang==='ua'
+        ? `\nДетальніше: https://mirvr.wayforpay.shop/`
+        : `\nПодробнее: https://mirvr.wayforpay.shop/`;
+      const addLabel = lang==='ua' ? '\n➕ Також можемо додати до свята:' : '\n➕ Также можем добавить к празднику:';
+      body += addLabel + availBlock + detailLink;
+    }
+
+    const hello    = lang==='ua' ? `Привіт, ${n}! 🎉` : `Привет, ${n}! 🎉`;
+    const subtitle = lang==='ua'
+      ? `Фіксуємо наші домовленості до вашого свята в MirVR — щоб все було зручно в одному місці 😊`
+      : `Фиксируем наши договорённости к вашему празднику в MirVR — чтобы всё было удобно в одном месте 😊`;
+    const footer   = lang==='ua'
+      ? `Якщо захочете щось додати — просто напишіть, залюбки допоможемо 😊\n📞 093 942 34 70 | 🌐 mirvr.com.ua`
+      : `Если захотите что-то добавить — просто напишите, с удовольствием поможем 😊\n📞 093 942 34 70 | 🌐 mirvr.com.ua`;
+
+    return `${hello}\n\n${subtitle}\n\n🎮 ${vrL}: ${fmt(vr)} грн\n${questNote}\n\n${body}\n\n${footer}`;
+  }
+
+  document.getElementById('msgUa').value = buildMsg('ua');
+  document.getElementById('msgRu').value = buildMsg('ru');
+});
+
+function copyMsg(id, btn) {
+  const el = document.getElementById(id);
+  navigator.clipboard.writeText(el.value).catch(() => { el.select(); document.execCommand('copy'); });
+  const prev = btn.textContent;
+  btn.textContent = '✓ Скопійовано';
+  setTimeout(() => btn.textContent = prev, 1200);
+}
+
+document.getElementById('themeBtn').addEventListener('click', () => {
+  const root = document.documentElement;
+  const dark = root.getAttribute('data-theme') === 'dark';
+  root.setAttribute('data-theme', dark ? 'light' : 'dark');
+  document.getElementById('themeBtn').textContent = dark ? '🌙' : '☀️';
+});
+
+updateTotals();
+</script>
+</body>
+</html>
