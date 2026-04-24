@@ -83,7 +83,10 @@
       <div class="field">
         <label>Вартість VR (грн)</label>
         <input id="vrCost" type="number" min="0" step="1" placeholder="0" />
-        <span class="hint">⚠️ Якщо є квест — доплата рахується окремо на місці</span>
+      </div>
+      <div class="field">
+        <label>PS-кімната (грн)</label>
+        <input id="psCost" type="number" min="0" step="1" placeholder="0" />
       </div>
       <div class="field">
         <label>Аванс сплачено (грн)</label>
@@ -180,14 +183,10 @@
       <span>грн</span>
     </div>
 
-    <!-- Поле напитков -->
-    <div class="extra-row" id="row-drinks">
-      <label>Кількість:</label>
-      <input type="number" class="narrow" id="drinks-qty" min="1" value="1" />
-      <span>× ціна:</span>
-      <input type="number" class="narrow" id="drinks-price" min="0" value="120" />
-      <span>грн =</span>
-      <span class="calc-result" id="drinks-total">120 грн</span>
+    <!-- Меню напитков -->
+    <div class="extra-row" id="row-drinks" style="flex-direction:column;align-items:flex-start;gap:6px">
+      <div id="drinks-menu" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;width:100%"></div>
+      <div style="font-weight:700;color:var(--primary)">Разом напої: <span id="drinks-total">0 грн</span></div>
     </div>
 
     <!-- Поле Помодоро -->
@@ -238,21 +237,75 @@
 <script>
 const fmt = n => Math.round(n).toLocaleString('uk-UA');
 
-// --- Цены ---
+// --- Меню напоїв ---
+const DRINKS_MENU = [
+  { ua: 'Мінеральна вода без газу 0,5 л', ru: 'Минеральная вода без газа 0,5 л', price: 45 },
+  { ua: 'Мінеральна вода газована 0,5 л', ru: 'Минеральная вода газированная 0,5 л', price: 45 },
+  { ua: 'Кока-Кола 0,5 л', ru: 'Кока-Кола 0,5 л', price: 55 },
+  { ua: 'Фанта 0,5 л', ru: 'Фанта 0,5 л', price: 55 },
+  { ua: 'Кока-Кола 0,33 л', ru: 'Кока-Кола 0,33 л', price: 55 },
+  { ua: 'Фанта 0,33 л', ru: 'Фанта 0,33 л', price: 55 },
+  { ua: 'Спрайт 0,5 л', ru: 'Спрайт 0,5 л', price: 55 },
+  { ua: 'Спрайт 0,33 л', ru: 'Спрайт 0,33 л', price: 55 },
+  { ua: 'Швепс 0,33 л', ru: 'Швепс 0,33 л', price: 55 },
+  { ua: 'Бьорн', ru: 'Бьорн', price: 80 },
+  { ua: 'Сік Річ дитячий 0,2', ru: 'Сок Рич детский 0,2', price: 40 },
+  { ua: 'Еспресо', ru: 'Эспрессо', price: 45 },
+  { ua: 'Американо', ru: 'Американо', price: 45 },
+  { ua: 'Капучіно', ru: 'Капучино', price: 60 },
+  { ua: 'Лате', ru: 'Латте', price: 60 },
+  { ua: 'Чай в асортименті', ru: 'Чай в ассортименте', price: 40 },
+  { ua: 'Ягідний чай', ru: 'Ягодный чай', price: 45 },
+  { ua: 'Чай у заварнику', ru: 'Чай в заварнике', price: 110 },
+  { ua: 'Ягідний чай у заварнику', ru: 'Ягодный чай в заварнике', price: 130 },
+  { ua: 'Мохіто', ru: 'Мохито', price: 120 },
+  { ua: 'Какао', ru: 'Какао', price: 55 },
+  { ua: 'Молочний коктейль', ru: 'Молочный коктейль', price: 120 },
+];
+
+function renderDrinksMenu() {
+  const container = document.getElementById('drinks-menu');
+  container.innerHTML = '';
+  DRINKS_MENU.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--card);border:1px solid var(--border);border-radius:7px';
+    div.innerHTML = `<span style="flex:1;font-size:13px">${item.ua} <span style="color:var(--muted)">(${item.price} грн)</span></span><input type="number" min="0" value="0" style="width:52px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 6px;font-size:13px;color:var(--text);outline:none" data-drink-idx="${i}" class="drink-qty" />`;
+    container.appendChild(div);
+  });
+  container.querySelectorAll('.drink-qty').forEach(el => el.addEventListener('input', updateTotals));
+}
+
+function getDrinksTotal() {
+  let total = 0;
+  document.querySelectorAll('.drink-qty').forEach(el => {
+    const qty = parseInt(el.value) || 0;
+    total += qty * DRINKS_MENU[parseInt(el.dataset.drinkIdx)].price;
+  });
+  return total;
+}
+
+function getDrinksLines(lang) {
+  const lines = [];
+  document.querySelectorAll('.drink-qty').forEach(el => {
+    const qty = parseInt(el.value) || 0;
+    if (qty > 0) {
+      const idx = parseInt(el.dataset.drinkIdx);
+      const name = lang === 'ua' ? DRINKS_MENU[idx].ua : DRINKS_MENU[idx].ru;
+      lines.push(`${name} × ${qty} (${fmt(qty * DRINKS_MENU[idx].price)} грн)`);
+    }
+  });
+  return lines;
+}
+
+// --- Цени ---
 function getPrice(cb) {
   const id = cb.id;
   if (!cb.checked) return 0;
   const dp = cb.dataset.price;
-  if (dp === 'auto-serv') {
-    return (parseInt(document.getElementById('serv-qty').value) || 0) * 90;
-  }
-  if (id === 'cb-photoz') return parseInt(document.getElementById('photoz-price').value) || 0;
-  if (id === 'cb-cake')   return parseInt(document.getElementById('cake-price').value) || 0;
-  if (id === 'cb-drinks') {
-    const q = parseInt(document.getElementById('drinks-qty').value) || 0;
-    const p = parseInt(document.getElementById('drinks-price').value) || 0;
-    return q * p;
-  }
+  if (dp === 'auto-serv') return (parseInt(document.getElementById('serv-qty').value) || 0) * 90;
+  if (id === 'cb-photoz')   return parseInt(document.getElementById('photoz-price').value) || 0;
+  if (id === 'cb-cake')     return parseInt(document.getElementById('cake-price').value) || 0;
+  if (id === 'cb-drinks')   return getDrinksTotal();
   if (id === 'cb-pomidoro') return parseInt(document.getElementById('pomidoro-price').value) || 0;
   return parseInt(dp) || 0;
 }
@@ -262,19 +315,15 @@ function calcAddons() {
 }
 
 function updateTotals() {
-  // Сервировка — считается по своему полю, независимо
   const servQty = parseInt(document.getElementById('serv-qty').value) || 1;
   document.getElementById('serv-total').textContent = fmt(servQty * 90) + ' грн';
-
-  // Напитки
-  const dQ = parseInt(document.getElementById('drinks-qty').value) || 0;
-  const dP = parseInt(document.getElementById('drinks-price').value) || 0;
-  document.getElementById('drinks-total').textContent = fmt(dQ * dP) + ' грн';
+  document.getElementById('drinks-total').textContent = fmt(getDrinksTotal()) + ' грн';
 
   const vr   = parseInt(document.getElementById('vrCost').value) || 0;
+  const ps   = parseInt(document.getElementById('psCost').value) || 0;
   const adv  = parseInt(document.getElementById('advance').value) || 0;
   const adds = calcAddons();
-  const total = vr + adds;
+  const total = vr + ps + adds;
   const pay   = Math.max(0, total - adv);
 
   document.getElementById('t-vr').textContent      = fmt(vr)    + ' грн';
@@ -311,124 +360,162 @@ document.querySelectorAll('.addon-cb').forEach(cb => {
 // Все инпуты
 document.querySelectorAll('input').forEach(el => el.addEventListener('input', updateTotals));
 
-// --- Генерация ---
+// --- Генерація ---
 document.getElementById('genBtn').addEventListener('click', () => {
   const name  = document.getElementById('clientName').value.trim() || 'Клієнт';
   const vr    = parseInt(document.getElementById('vrCost').value) || 0;
+  const ps    = parseInt(document.getElementById('psCost').value) || 0;
   const adv   = parseInt(document.getElementById('advance').value) || 0;
   const adds  = calcAddons();
-  const total = vr + adds;
+  const total = vr + ps + adds;
   const pay   = Math.max(0, total - adv);
 
   const allCbs = [...document.querySelectorAll('.addon-cb')];
 
-  // Категории
+  // Категорії для блоку "Також можемо додати"
   const CATS = [
-    { key: 'decor',  ua: '🎨 Декор:',         ru: '🎨 Декор:',          ids: ['cb-decor1','cb-photoz','cb-serv'] },
-    { key: 'fun',    ua: '🎉 Розваги:',        ru: '🎉 Развлечения:',    ids: null, names_ua: ['Аніматор','Ведучий настільних ігор','Святкова піньята','Наповнення до піньяти','Неонові святкові аксесуари'] },
-    { key: 'photo',  ua: '📸 Фото/відео:',     ru: '📸 Фото/видео:',     ids: null, names_ua: ['Професійний дитячий фотограф','Професійний відеограф'] },
-    { key: 'food',   ua: '🎂 Їжа та напої:',   ru: '🎂 Еда и напитки:',  ids: ['cb-cake','cb-drinks','cb-pomidoro'] },
+    {
+      ua: '🎨 Декор:',       ru: '🎨 Декор:',
+      ids: ['cb-decor1','cb-photoz','cb-serv']
+    },
+    {
+      ua: '🎉 Розваги:',     ru: '🎉 Развлечения:',
+      ids: null,
+      names_ua: ['Аніматор','Ведучий настільних ігор','Святкова піньята','Наповнення до піньяти','Неонові святкові аксесуари']
+    },
+    {
+      ua: '📸 Фото/відео:',  ru: '📸 Фото/видео:',
+      ids: null,
+      names_ua: ['Професійний дитячий фотограф','Професійний відеограф']
+    },
+    {
+      ua: '🎂 Їжа та напої:', ru: '🎂 Еда и напитки:',
+      ids: ['cb-cake','cb-drinks','cb-pomidoro']
+    },
   ];
 
-  function lineForCb(cb, lang, checked) {
-    const marker = checked ? '✅' : '◻️';
+  // --- Рядок для ОБРАНОГО елемента (✅) ---
+  function chosenLine(cb, lang) {
+    const id = cb.id;
     const nameUa = cb.dataset.nameUa;
     const nameRu = cb.dataset.nameRu;
-    const name   = lang === 'ua' ? nameUa : nameRu;
-    const id     = cb.id;
-    const dp     = cb.dataset.price;
+    const n = lang === 'ua' ? nameUa : nameRu;
 
-    if (checked) {
-      const price = getPrice(cb);
-      if (id === 'cb-serv') {
-        const qty = parseInt(document.getElementById('serv-qty').value) || 1;
-        return lang === 'ua'
-          ? `— ${marker} ${name} (${qty} осіб × 90 грн) — ${fmt(qty*90)} грн`
-          : `— ${marker} ${name} (${qty} чел. × 90 грн) — ${fmt(qty*90)} грн`;
-      }
-      if (id === 'cb-drinks') {
-        const q = parseInt(document.getElementById('drinks-qty').value)||0;
-        const p = parseInt(document.getElementById('drinks-price').value)||0;
-        return `— ${marker} ${name} 🍹 (${q} шт × ${p} грн) — ${fmt(q*p)} грн`;
-      }
-      if (price === 0) {
-        return lang === 'ua'
-          ? `— ${marker} ${name} — за домовленістю`
-          : `— ${marker} ${name} — по договорённости`;
-      }
-      return `— ${marker} ${name} — ${fmt(price)} грн`;
-    } else {
-      // невыбранный
-      if (id === 'cb-serv')     return lang==='ua' ? `— ${marker} ${name} — 90 грн/особа`         : `— ${marker} ${name} — 90 грн/чел.`;
-      if (id === 'cb-cake')     return lang==='ua' ? `— ${marker} ${name} — від 1 800 грн/кг`      : `— ${marker} ${name} — от 1 800 грн/кг`;
-      if (id === 'cb-drinks')   return lang==='ua' ? `— ${marker} ${name} 🍹 — за домовленістю`    : `— ${marker} ${name} 🍹 — по договорённости`;
-      if (id === 'cb-pomidoro') return lang==='ua' ? `— ${marker} ${name} 🍕 — за домовленістю (https://delivery.pomodoro.od.ua/restaurants/4)` : `— ${marker} ${name} 🍕 — по договорённости (https://delivery.pomodoro.od.ua/restaurants/4)`;
-      if (id === 'cb-photoz')   return lang==='ua' ? `— ${marker} ${name} — за домовленістю`       : `— ${marker} ${name} — по договорённости`;
-      const p = parseInt(dp)||0;
-      return p > 0 ? `— ${marker} ${name} — ${fmt(p)} грн` : (lang==='ua' ? `— ${marker} ${name} — за домовленістю` : `— ${marker} ${name} — по договорённости`);
+    if (id === 'cb-serv') {
+      const qty = parseInt(document.getElementById('serv-qty').value) || 1;
+      const total = qty * 90;
+      return lang === 'ua'
+        ? `✅ ${n} (${qty} осіб × 90 грн) — ${fmt(total)} грн`
+        : `✅ ${n} (${qty} чел. × 90 грн) — ${fmt(total)} грн`;
     }
+    if (id === 'cb-drinks') {
+      const drinkLines = getDrinksLines(lang);
+      const dTotal = getDrinksTotal();
+      const header = lang === 'ua' ? `✅ Напої на барі 🍹 — ${fmt(dTotal)} грн` : `✅ Напитки на баре 🍹 — ${fmt(dTotal)} грн`;
+      if (drinkLines.length > 0) {
+        return header + '\n   ' + drinkLines.join('\n   ');
+      }
+      return header;
+    }
+    if (id === 'cb-pomidoro') {
+      const p = parseInt(document.getElementById('pomidoro-price').value) || 0;
+      const suffix = p > 0 ? ` — ${fmt(p)} грн` : '';
+      return lang === 'ua'
+        ? `✅ ${n} 🍕${suffix} (https://delivery.pomodoro.od.ua/restaurants/4)`
+        : `✅ ${n} 🍕${suffix} (https://delivery.pomodoro.od.ua/restaurants/4)`;
+    }
+    if (id === 'cb-photoz') {
+      const p = parseInt(document.getElementById('photoz-price').value) || 0;
+      return p > 0 ? `✅ ${n} — ${fmt(p)} грн` : (lang === 'ua' ? `✅ ${n} — за домовленістю` : `✅ ${n} — по договорённости`);
+    }
+    if (id === 'cb-cake') {
+      const p = parseInt(document.getElementById('cake-price').value) || 0;
+      return p > 0 ? `✅ ${n} — ${fmt(p)} грн` : (lang === 'ua' ? `✅ ${n} — від 1 800 грн/кг` : `✅ ${n} — от 1 800 грн/кг`);
+    }
+    const price = getPrice(cb);
+    return price > 0 ? `✅ ${n} — ${fmt(price)} грн` : (lang === 'ua' ? `✅ ${n} — за домовленістю` : `✅ ${n} — по договорённости`);
   }
 
-  function buildBlock(lang) {
+  // --- Рядок для НЕОБРАНОГО елемента (без маркерів) ---
+  function availLine(cb, lang) {
+    const id = cb.id;
+    const nameUa = cb.dataset.nameUa;
+    const nameRu = cb.dataset.nameRu;
+    const n = lang === 'ua' ? nameUa : nameRu;
+    const dp = cb.dataset.price;
+
+    if (id === 'cb-serv')     return lang === 'ua' ? `${n} (90 грн/особа)` : `${n} (90 грн/чел.)`;
+    if (id === 'cb-cake')     return lang === 'ua' ? `${n} (від 1\u00a0800 грн/кг)` : `${n} (от 1\u00a0800 грн/кг)`;
+    if (id === 'cb-drinks')   return lang === 'ua' ? `${n} 🍹` : `${n} 🍹`;
+    if (id === 'cb-pomidoro') return lang === 'ua'
+      ? `${n} 🍕 (https://delivery.pomodoro.od.ua/restaurants/4)`
+      : `${n} 🍕 (https://delivery.pomodoro.od.ua/restaurants/4)`;
+    if (id === 'cb-photoz')   return lang === 'ua' ? `${n} (від 1\u00a0500 грн)` : `${n} (от 1\u00a0500 грн)`;
+    const p = parseInt(dp) || 0;
+    return p > 0 ? `${n} (${fmt(p)} грн)` : (lang === 'ua' ? `${n} (за домовленістю)` : `${n} (по договорённости)`);
+  }
+
+  // --- Блок "Також можемо додати" (лише невибрані, по категоріях) ---
+  function buildAvailBlock(lang) {
     let block = '';
     CATS.forEach(cat => {
       const cbs = cat.ids
         ? cat.ids.map(id => document.getElementById(id)).filter(Boolean)
         : allCbs.filter(cb => cat.names_ua.includes(cb.dataset.nameUa));
-
-      const uncheckedLines = cbs.filter(cb=>!cb.checked).map(cb=>lineForCb(cb,lang,false));
-      if (uncheckedLines.length) block += `\n${lang==='ua'?cat.ua:cat.ru}\n${uncheckedLines.join('\n')}`;
+      const unchecked = cbs.filter(cb => !cb.checked);
+      if (unchecked.length === 0) return;
+      const header = lang === 'ua' ? cat.ua : cat.ru;
+      const lines = unchecked.map(cb => availLine(cb, lang));
+      block += `\n${header}\n${lines.join(', ')}\n`;
     });
     return block;
   }
 
-  const hasChosen = allCbs.some(cb => cb.checked);
-
+  // --- Збірка повідомлення ---
   function buildMsg(lang) {
-    const n   = lang==='ua' ? name : name;
-    const vrL = lang==='ua' ? 'VR-ігри' : 'VR-игры';
-    const questNote = lang==='ua'
-      ? '⚠️ Якщо є квест — доплата за нього розраховується окремо на місці'
-      : '⚠️ Если есть квест — доплата за него рассчитывается отдельно на месте';
+    const vrL = lang === 'ua' ? 'VR-ігри' : 'VR-игры';
+    const psL = lang === 'ua' ? 'PS-кімната' : 'PS-комната';
+    const questNote = lang === 'ua'
+      ? '_Якщо є квест — доплата розраховується окремо на місці_'
+      : '_Если есть квест — доплата рассчитывается отдельно на месте_';
 
-    let body = '';
-    if (hasChosen) {
-      const chosenCbs   = allCbs.filter(cb=>cb.checked);
-      const uncheckedCbs = allCbs.filter(cb=>!cb.checked);
-      const chosenLines  = chosenCbs.map(cb=>lineForCb(cb,lang,true));
+    const greeting = lang === 'ua'
+      ? `${name}, фіксуємо наші домовленості до вашого свята в MirVR 🎉`
+      : `${name}, фиксируем наши договорённости к вашему празднику в MirVR 🎉`;
 
-      body = lang==='ua'
-        ? `🎁 Ви вже обрали:\n${chosenLines.join('\n')}\n\n💰 Загальна сума: ${fmt(total)} грн\n✅ Аванс сплачено: ${fmt(adv)} грн\n🔥 Доплата в клубі: ${fmt(pay)} грн`
-        : `🎁 Вы уже выбрали:\n${chosenLines.join('\n')}\n\n💰 Общая сумма: ${fmt(total)} грн\n✅ Аванс оплачен: ${fmt(adv)} грн\n🔥 Доплата в клубе: ${fmt(pay)} грн`;
+    // Рядки VR і PS
+    let priceLines = `*${vrL}:* ${fmt(vr)} грн`;
+    if (ps > 0) priceLines += `\n*${psL}:* ${fmt(ps)} грн`;
+    priceLines += `\n${questNote}`;
 
-      if (uncheckedCbs.length > 0) {
-        const availBlock = buildBlock(lang);
-        const detailLink = lang==='ua'
-          ? `\nДетальніше: https://mirvr.wayforpay.shop/`
-          : `\nПодробнее: https://mirvr.wayforpay.shop/`;
-        const addLabel = lang==='ua' ? '\n➕ Також можемо додати до свята:' : '\n➕ Также можем добавить к празднику:';
-        body += addLabel + availBlock + detailLink;
-      }
-    } else {
-      body = lang==='ua'
-        ? `💳 Аванс сплачено: ${fmt(adv)} грн\n🔥 Доплата в клубі: ${fmt(pay)} грн`
-        : `💳 Аванс оплачен: ${fmt(adv)} грн\n🔥 Доплата в клубе: ${fmt(pay)} грн`;
-      const availBlock = buildBlock(lang);
-      const detailLink = lang==='ua'
-        ? `\nДетальніше: https://mirvr.wayforpay.shop/`
-        : `\nПодробнее: https://mirvr.wayforpay.shop/`;
-      const addLabel = lang==='ua' ? '\n➕ Також можемо додати до свята:' : '\n➕ Также можем добавить к празднику:';
-      body += addLabel + availBlock + detailLink;
+    // Обрані допи
+    const chosenCbs = allCbs.filter(cb => cb.checked);
+    let chosenBlock = '';
+    if (chosenCbs.length > 0) {
+      const lines = chosenCbs.map(cb => chosenLine(cb, lang));
+      const label = lang === 'ua' ? '🎁 *Ви вже обрали:*' : '🎁 *Вы уже выбрали:*';
+      chosenBlock = `\n${label}\n${lines.join('\n')}`;
     }
 
-    const greeting = lang==='ua'
-      ? `${n}, фіксуємо наші домовленості до вашого свята в MirVR 🎉`
-      : `${n}, фиксируем наши договорённости к вашему празднику в MirVR 🎉`;
-    const footer = lang==='ua'
-      ? `Якщо захочете щось додати — просто напишіть, залюбки допоможемо 😊`
-      : `Если захотите что-то добавить — просто напишите, с удовольствием поможем 😊`;
+    // Підсумки
+    const totalLabel  = lang === 'ua' ? '*Загальна сума:*' : '*Общая сумма:*';
+    const advLabel    = lang === 'ua' ? '✅ *Аванс сплачено:*' : '✅ *Аванс оплачен:*';
+    const payLabel    = lang === 'ua' ? '*До оплати в клубі:*' : '*До оплаты в клубе:*';
+    const totalsBlock = `${totalLabel} ${fmt(total)} грн\n${advLabel} ${fmt(adv)} грн\n${payLabel} ${fmt(pay)} грн`;
 
-    return `${greeting}\n\n🎮 ${vrL}: ${fmt(vr)} грн\n${questNote}\n\n${body}\n\n${footer}`;
+    // Блок доступних допів
+    const availBlock = buildAvailBlock(lang);
+    let addSection = '';
+    if (availBlock.trim()) {
+      const addLabel = lang === 'ua' ? '*Також можемо додати:*' : '*Также можем добавить:*';
+      addSection = `\n${addLabel}\n${availBlock}`;
+    }
+
+    const footer = lang === 'ua'
+      ? 'Якщо захочете щось додати — просто напишіть 😊'
+      : 'Если захотите что-то добавить — просто напишите 😊';
+
+    return `${greeting}\n\n${priceLines}${chosenBlock}\n\n${totalsBlock}${addSection}\n${footer}`;
   }
 
   document.getElementById('msgUa').value = buildMsg('ua');
