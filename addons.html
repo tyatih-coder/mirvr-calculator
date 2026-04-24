@@ -89,10 +89,7 @@
         <label>Аванс сплачено (грн)</label>
         <input id="advance" type="number" min="0" step="1" placeholder="0" />
       </div>
-      <div class="field">
-        <label>Кількість гостей</label>
-        <input id="guestCount" type="number" min="1" step="1" placeholder="1" value="1" />
-      </div>
+
     </div>
   </div>
 
@@ -265,11 +262,9 @@ function calcAddons() {
 }
 
 function updateTotals() {
-  // Синхронизируем кол-во гостей с сервировкой
-  const guests = parseInt(document.getElementById('guestCount').value) || 1;
-  const servQtyEl = document.getElementById('serv-qty');
-  servQtyEl.value = guests;
-  document.getElementById('serv-total').textContent = fmt(guests * 90) + ' грн';
+  // Сервировка — считается по своему полю, независимо
+  const servQty = parseInt(document.getElementById('serv-qty').value) || 1;
+  document.getElementById('serv-total').textContent = fmt(servQty * 90) + ' грн';
 
   // Напитки
   const dQ = parseInt(document.getElementById('drinks-qty').value) || 0;
@@ -318,7 +313,7 @@ document.querySelectorAll('input').forEach(el => el.addEventListener('input', up
 
 // --- Генерация ---
 document.getElementById('genBtn').addEventListener('click', () => {
-  const name  = document.getElementById('clientName').value.trim() || 'друже';
+  const name  = document.getElementById('clientName').value.trim() || 'Клієнт';
   const vr    = parseInt(document.getElementById('vrCost').value) || 0;
   const adv   = parseInt(document.getElementById('advance').value) || 0;
   const adds  = calcAddons();
@@ -381,10 +376,8 @@ document.getElementById('genBtn').addEventListener('click', () => {
         ? cat.ids.map(id => document.getElementById(id)).filter(Boolean)
         : allCbs.filter(cb => cat.names_ua.includes(cb.dataset.nameUa));
 
-      const checkedLines   = cbs.filter(cb=>cb.checked).map(cb=>lineForCb(cb,lang,true));
       const uncheckedLines = cbs.filter(cb=>!cb.checked).map(cb=>lineForCb(cb,lang,false));
-      const all = [...checkedLines, ...uncheckedLines];
-      if (all.length) block += `\n${lang==='ua'?cat.ua:cat.ru}\n${all.join('\n')}`;
+      if (uncheckedLines.length) block += `\n${lang==='ua'?cat.ua:cat.ru}\n${uncheckedLines.join('\n')}`;
     });
     return block;
   }
@@ -428,15 +421,14 @@ document.getElementById('genBtn').addEventListener('click', () => {
       body += addLabel + availBlock + detailLink;
     }
 
-    const hello    = lang==='ua' ? `Привіт, ${n}! 🎉` : `Привет, ${n}! 🎉`;
-    const subtitle = lang==='ua'
-      ? `Фіксуємо наші домовленості до вашого свята в MirVR — щоб все було зручно в одному місці 😊`
-      : `Фиксируем наши договорённости к вашему празднику в MirVR — чтобы всё было удобно в одном месте 😊`;
-    const footer   = lang==='ua'
-      ? `Якщо захочете щось додати — просто напишіть, залюбки допоможемо 😊\n📞 093 942 34 70 | 🌐 mirvr.com.ua`
-      : `Если захотите что-то добавить — просто напишите, с удовольствием поможем 😊\n📞 093 942 34 70 | 🌐 mirvr.com.ua`;
+    const greeting = lang==='ua'
+      ? `${n}, фіксуємо наші домовленості до вашого свята в MirVR 🎉`
+      : `${n}, фиксируем наши договорённости к вашему празднику в MirVR 🎉`;
+    const footer = lang==='ua'
+      ? `Якщо захочете щось додати — просто напишіть, залюбки допоможемо 😊`
+      : `Если захотите что-то добавить — просто напишите, с удовольствием поможем 😊`;
 
-    return `${hello}\n\n${subtitle}\n\n🎮 ${vrL}: ${fmt(vr)} грн\n${questNote}\n\n${body}\n\n${footer}`;
+    return `${greeting}\n\n🎮 ${vrL}: ${fmt(vr)} грн\n${questNote}\n\n${body}\n\n${footer}`;
   }
 
   document.getElementById('msgUa').value = buildMsg('ua');
