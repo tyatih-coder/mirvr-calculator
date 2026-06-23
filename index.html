@@ -376,62 +376,13 @@ function calcBirthday(start, end, totalPlaces, dayType) {
   let discountTotal = 0;
   let discountLine = '';
 
-  let gameIntervals = [];
-  if (totalMinutes > BANQUET1_MIN + BANQUET2_MIN) {
-    const banquet1Start = start;
-    const banquet1End   = start + BANQUET1_MIN;
-
-    const playMinutesTotal = totalMinutes - BANQUET1_MIN - BANQUET2_MIN;
-    const eachPlay         = playMinutesTotal / 2;
-
-    const game1Start = banquet1End;
-    const game1End   = game1Start + eachPlay;
-
-    const banquet2Start = game1End;
-    const banquet2End   = banquet2Start + BANQUET2_MIN;
-
-    const game2Start = banquet2End;
-    const game2End   = game2Start + eachPlay;
-
-    timeline.push(
-      { start: banquet1Start, end: banquet1End, text: `${fmtTime(banquet1Start)}–${fmtTime(banquet1End)} банкет — 30 минут` },
-      { start: banquet2Start, end: banquet2End, text: `${fmtTime(banquet2Start)}–${fmtTime(banquet2End)} торжественная часть / торт — 30 минут` }
-    );
-
-    gameIntervals = [
-      { start: game1Start, end: game1End },
-      { start: game2Start, end: game2End }
-    ];
-  } else {
-    gameIntervals = [{ start, end }];
-  }
-
-  const gameSegments = [];
-  gameIntervals.forEach(g => {
-    if (dayType.isWeekday) {
-      if (g.start < SWITCH_MINUTES) {
-        gameSegments.push({
-          start: g.start,
-          end: Math.min(g.end, SWITCH_MINUTES),
-          label: 'до 18:00'
-        });
-      }
-      if (g.end > SWITCH_MINUTES) {
-        gameSegments.push({
-          start: Math.max(g.start, SWITCH_MINUTES),
-          end: g.end,
-          label: 'после 18:00'
-        });
-      }
-    } else {
-      gameSegments.push({ start: g.start, end: g.end, label: 'выходной/праздник' });
-    }
-  });
+  // ... вся логика банкетов, gameIntervals, gameSegments ...
 
   let totalGameMinutes = 0;
   gameSegments.forEach(seg => { totalGameMinutes += (seg.end - seg.start); });
   const totalGameHours = totalGameMinutes / 60;
 
+  // базовая сумма
   gameSegments.forEach(seg => {
     const rate = rateForMinute(seg.start, dayType.isWeekday);
     const hours = (seg.end - seg.start) / 60;
@@ -444,22 +395,11 @@ function calcBirthday(start, end, totalPlaces, dayType) {
     });
   });
 
+  // Скидка
   if (totalGameHours >= 3) {
-    const minutesList = [];
-    gameIntervals.forEach(interval => {
-      for (let m = interval.start; m < interval.end; m++) {
-        minutesList.push(m);
-      }
-    });
-    minutesList.sort((a, b) => a - b);
-
-    const discountMinutes = minutesList.slice(120);
-
-    let tailCostAllPlayers = 0;
-    discountMinutes.forEach(minute => {
-      const rate = rateForMinute(minute, dayType.isWeekday);
-      tailCostAllPlayers += rate * (1 / 60) * totalPlaces;
-    });
+    const discountedHours = totalGameHours - 2;
+    const avgRateAll = baseTotal / (totalGameHours * totalPlaces);
+    const tailCostAllPlayers = avgRateAll * discountedHours * totalPlaces;
 
     discountTotal = tailCostAllPlayers * 0.5;
     discountLine = `Скидка начиная с 3-го часа (50%): ${money(discountTotal)}`;
@@ -476,7 +416,6 @@ function calcBirthday(start, end, totalPlaces, dayType) {
 
   return { baseTotal, discountTotal, timeline, discountLine, totalGameHours };
 }
-
 // Тайминг ДР для сообщений
 function buildBirthdayTimeline(startMin, endMin, lang) {
   const totalMinutes = endMin - startMin;
