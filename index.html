@@ -142,7 +142,7 @@
             <div class="stat"><span>Скидка</span><strong id="discountValue">0 грн</strong></div>
             <div class="stat"><span>Базовая сумма</span><strong id="baseTotal">0 грн</strong></div>
             <div class="stat"><span>VR шлемы</span><strong id="vrStat">0</strong></div>
-            <div class="stat"><span>PlayStation</span><strong id="psStat">0</strong></div>
+            <div class="stat" id="psStatBox"><span>PlayStation</span><strong id="psStat">0</strong></div>
           </div>
           <div class="box" style="margin-bottom:14px">
             <div class="box-head">
@@ -335,7 +335,7 @@
         </div>
         <div class="total-box" style="margin-top:18px">
           <div class="t-item">🎮 VR: <strong id="t-vr">0 грн</strong></div>
-          <div class="t-item">🕹 PS: <strong id="t-ps">0 грн</strong></div>
+          <div class="t-item" id="tPsBox">🕹 PS: <strong id="t-ps">0 грн</strong></div>
           <div class="t-item">🎁 Допи: <strong id="t-addons">0 грн</strong></div>
           <div class="t-item">💰 Разом: <strong id="t-total">0 грн</strong></div>
           <div class="t-item">✅ Аванс: <strong id="t-advance-view">0 грн</strong></div>
@@ -838,6 +838,7 @@ https://mirvrbirthday.wayforpay.shop/`;
   const PLAYERS   = ctx.players;
   const VR        = ctx.vr;
   const PS        = ctx.ps;
+  const PS_PART   = PS > 0 ? `, PS: ${PS}` : '';
   const PRICE     = Math.round(ctx.price);
   const hasAdmin  = !!(ctx.admin && ctx.admin.trim());
   const ADMIN     = ctx.admin || '';
@@ -853,7 +854,7 @@ https://mirvrbirthday.wayforpay.shop/`;
 Вы забронировали игровое время в клубе MirVR на:
 🔔 Дата: ${DATE_RU}
 ⌛️ Время: ${TIME_FROM} – ${TIME_TO}
-🎮 Участников: ${PLAYERS} (VR: ${VR}, PS: ${PS})
+🎮 Участников: ${PLAYERS} (VR: ${VR}${PS_PART})
 💰 Стоимость: ${PRICE} грн
 +50 грн/час/чел доплата за квест, если вы выберете его на месте.
 Будем рады видеть вас за 5–10 минут до начала игрового времени.
@@ -869,7 +870,7 @@ https://mirvrbirthday.wayforpay.shop/`;
 Ви забронювали ігровий час у клубі MirVR на:
 🔔 Дата: ${DATE_UA}
 ⌛️ Час: ${TIME_FROM} – ${TIME_TO}
-🎮 Учасників: ${PLAYERS} (VR: ${VR}, PS: ${PS})
+🎮 Учасників: ${PLAYERS} (VR: ${VR}${PS_PART})
 💰 Вартість: ${PRICE} грн
 +50 грн/год/люд доплата за квест, якщо ви оберете його на місці.
 Будемо раді бачити вас у гостях за 5–10 хвилин до початку ігрового часу.
@@ -886,7 +887,7 @@ https://mirvrbirthday.wayforpay.shop/`;
 Вы забронировали игровое время в клубе MirVR на:
 🔔 Дата: ${DATE_RU}
 ⌛️ Время: ${TIME_FROM} – ${TIME_TO}
-🎮 Участников: ${PLAYERS} (VR: ${VR}, PS: ${PS})
+🎮 Участников: ${PLAYERS} (VR: ${VR}${PS_PART})
 💰 Стоимость: ${PRICE} грн
 +50 грн/час/чел доплата за квест, если вы выберете его на месте.
 Будем рады видеть вас за 5–10 минут до начала игрового времени.
@@ -908,7 +909,7 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
 Ви забронювали ігровий час у клубі MirVR на:
 🔔 Дата: ${DATE_UA}
 ⌛️ Час: ${TIME_FROM} – ${TIME_TO}
-🎮 Учасників: ${PLAYERS} (VR: ${VR}, PS: ${PS})
+🎮 Учасників: ${PLAYERS} (VR: ${VR}${PS_PART})
 💰 Вартість: ${PRICE} грн
 +50 грн/год/люд доплата за квест, якщо ви оберете його на місці.
 Будемо раді бачити вас у гостях за 5–10 хвилин до початку ігрового часу.
@@ -1099,11 +1100,19 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
   bdayExtrasSection.style.display = msgType === 'birthday' ? 'block' : 'none';
   if (addonsSection) addonsSection.style.display = msgType === 'birthday' ? 'block' : 'none';
 }
+function setPsVisibility(ps) {
+  const show = ps > 0;
+  const box1 = document.getElementById('psStatBox');
+  const box2 = document.getElementById('tPsBox');
+  if (box1) box1.style.display = show ? '' : 'none';
+  if (box2) box2.style.display = show ? '' : 'none';
+}
 function calc() {
   let vr = clamp(Number(vrPlacesEl.value || 0), 0, 11);
   let ps = clamp(Number(psPlacesEl.value || 0), 0, 3);
   vrPlacesEl.value = vr;
   psPlacesEl.value = ps;
+  setPsVisibility(ps);
   const totalPlaces = vr + ps;
   const start        = toMinutes(startEl.value);
   const end          = toMinutes(endEl.value);
@@ -1202,7 +1211,7 @@ function calc() {
     `Дата: ${gameDateEl.value || 'не выбрана'}`,
     `Тип дня: ${dayType.label}`,
     `VR шлемы: ${vr}`,
-    `PlayStation: ${ps}`,
+    ...(ps > 0 ? [`PlayStation: ${ps}`] : []),
     `Время: ${startEl.value}–${endEl.value}`,
     ''
   ];
