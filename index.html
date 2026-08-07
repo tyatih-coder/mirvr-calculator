@@ -173,8 +173,11 @@
         <div class="grid">
           <div class="full">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-              <h3 style="margin:0">Сообщение для клиента (RU)</h3>
-              <button class="btn secondary" onclick="copyExtra('msgRu')">Скопировать RU</button>
+              <h3 style="margin:0">Сообщение для клиента (RU / UA)</h3>
+              <div style="display:flex;gap:10px">
+                <button class="btn secondary" onclick="copyExtra('msgRu')">Скопировать RU</button>
+                <button class="btn secondary" onclick="copyExtra('msgUa')">Скопіювати UA</button>
+              </div>
             </div>
             <textarea id="msgRu" rows="18" readonly></textarea>
           </div>
@@ -273,11 +276,28 @@
         </div>
         <div class="section-title">🎉 Розваги</div>
         <div class="addons-grid">
-          <label class="addon-item"><input type="checkbox" class="addon-cb" id="cb-animator" data-name-ua="Аніматор" data-name-ru="Аниматор" data-price="4400"><div><div class="addon-label">Аніматор</div><div class="addon-price">4 400 грн/год</div></div></label>
+          <label class="addon-item"><input type="checkbox" class="addon-cb" id="cb-animator" data-name-ua="Аніматор" data-name-ru="Аниматор" data-price="custom"><div><div class="addon-label">Аніматор</div><div class="addon-price">ціна вручну</div></div></label>
           <label class="addon-item"><input type="checkbox" class="addon-cb" id="cb-games" data-name-ua="Настільні ігри" data-name-ru="Настольные игры" data-price="1500"><div><div class="addon-label">Настільні ігри</div><div class="addon-price">1 500 грн/год</div></div></label>
           <label class="addon-item"><input type="checkbox" class="addon-cb" id="cb-pinata" data-name-ua="Піньята" data-name-ru="Пиньята" data-price="1100"><div><div class="addon-label">Піньята</div><div class="addon-price">1 100 грн</div></div></label>
           <label class="addon-item"><input type="checkbox" class="addon-cb" id="cb-candy" data-name-ua="Цукерки до піньяти" data-name-ru="Конфеты для пиньяты" data-price="700"><div><div class="addon-label">Цукерки до піньяти</div><div class="addon-price">700 грн</div></div></label>
           <label class="addon-item"><input type="checkbox" class="addon-cb" id="cb-bracelets" data-name-ua="Неонові браслети" data-name-ru="Неоновые браслеты" data-price="400"><div><div class="addon-label">Неонові браслети</div><div class="addon-price">400 грн</div></div></label>
+        </div>
+        <div class="extra-row" id="row-animator">
+          <label>Час:</label>
+          <input type="time" class="medium" id="animator-time" placeholder="з" />
+          <span>–</span>
+          <input type="time" class="medium" id="animator-end-time" placeholder="до" />
+          <label>Сума:</label>
+          <input type="number" class="medium" id="animator-price" min="0" placeholder="напр. 4400" />
+          <span>грн</span>
+        </div>
+        <div class="extra-row" id="row-games">
+          <label>Час:</label>
+          <input type="time" class="medium" id="games-time" placeholder="з" />
+          <span>–</span>
+          <input type="time" class="medium" id="games-end-time" placeholder="до" />
+          <span>× 1500 грн/год =</span>
+          <span class="calc-result" id="games-total">0 грн</span>
         </div>
         <div class="section-title">📸 Фото/відео</div>
         <div class="addons-grid">
@@ -516,34 +536,25 @@ function calcQuest(start, end, totalPlaces, dayType) {
   return { baseTotal, timeline };
 }
 // День рождения
-function calcBirthday(start, end, vr, ps, dayType) {
+function calcBirthday(start, end, vr, ps, dayType, addonBlocks) {
+  addonBlocks = addonBlocks || [];
   const totalPlaces = vr + ps;
-  const totalMinutes = end - start;
-  const BANQUET1_MIN = 30;
-  const BANQUET2_MIN = 30;
   const timeline = [];
   let baseTotal = 0;
   let vrBaseTotal = 0;
   let psBaseTotal = 0;
   let discountTotal = 0;
   let discountLine = '';
-  // Определяем игровые сегменты (банкеты не тарифицируются)
-  let gameSegments = [];
-  if (totalMinutes <= 60) {
-    gameSegments.push({ start, end, label: 'Игровое время' });
-  } else {
-    const banquet1End = start + BANQUET1_MIN;
-    const playMinutesTotal = totalMinutes - BANQUET1_MIN - BANQUET2_MIN;
-    const eachPlay = Math.round((playMinutesTotal / 2) / 15) * 15;
-    const game1Start = banquet1End;
-    const game1End   = game1Start + eachPlay;
-    const banquet2End = game1End + BANQUET2_MIN;
-    const game2Start = banquet2End;
-    const game2End   = game2Start + eachPlay;
-    gameSegments.push({ start: game1Start, end: game1End, label: 'Игровое время' });
-    gameSegments.push({ start: game2Start, end: game2End, label: 'Игры и сбор банкета' });
-  }
-  // Суммарное игровое время (часы)
+  // Розклад свята з урахуванням аніматора/настільних ігор (якщо вказано час):
+  // їхні блоки вставляються в потрібне місце і зсувають усе, що йде після,
+  // тож ігровий (тарифікований) час може реально потрапити на інший тариф.
+  const baseSegments = buildBaseBirthdaySegments(start, end);
+  const schedule = insertAddonBlocksIntoSchedule(baseSegments, addonBlocks);
+  // Ігрові сегменти для тарифікації VR/PS — лише ті, що позначені billable
+  const gameSegments = schedule
+    .filter(seg => seg.billable)
+    .map(seg => ({ start: seg.start, end: seg.end, label: seg.labelRu }));
+  // Суммарное игровое время (часы) — не меняется от сдвига, меняется только его положение на часах
   let totalGameMinutes = 0;
   gameSegments.forEach(seg => { totalGameMinutes += (seg.end - seg.start); });
   const totalGameHours = totalGameMinutes / 60;
@@ -622,7 +633,7 @@ function calcBirthday(start, end, vr, ps, dayType) {
   }
   const vrFinal = Math.max(0, vrBaseTotal - discountTotalVr);
   const psFinal = Math.max(0, psBaseTotal - discountTotalPs);
-  return { baseTotal, vrBaseTotal, psBaseTotal, vrFinal, psFinal, discountTotal, timeline, discountLine, totalGameHours, segDetails };
+  return { baseTotal, vrBaseTotal, psBaseTotal, vrFinal, psFinal, discountTotal, timeline, discountLine, totalGameHours, segDetails, schedule };
 }
 // Тайминг ДР для сообщений
 function buildBirthdayTimeline(startMin, endMin, lang) {
@@ -916,8 +927,14 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
 📍 Європейська, 89 (Катерининська)
 🌐 https://mirvr.com.ua`;
   } else if (msgType === 'birthday') {
-    const TIMELINE_UA   = buildBirthdayTimeline(ctx.start, ctx.end, 'ua');
-    const TIMELINE_RU   = buildBirthdayTimeline(ctx.start, ctx.end, 'ru');
+    // Якщо є розклад з урахуванням аніматора/настільних ігор — показуємо саме його,
+    // інакше звичайний шаблон банкет-ігри-торт-ігри.
+    const TIMELINE_UA   = (ctx.birthdaySchedule && ctx.birthdaySchedule.length)
+      ? formatScheduleLines(ctx.birthdaySchedule, 'ua')
+      : buildBirthdayTimeline(ctx.start, ctx.end, 'ua');
+    const TIMELINE_RU   = (ctx.birthdaySchedule && ctx.birthdaySchedule.length)
+      ? formatScheduleLines(ctx.birthdaySchedule, 'ru')
+      : buildBirthdayTimeline(ctx.start, ctx.end, 'ru');
     const CALC_UA       = buildBirthdayCalcBlock(VR, PS, ctx.baseTotal, ctx.discountTotal, ctx.finalTotal, ctx.segDetails || [], 'ua');
     const CALC_RU       = buildBirthdayCalcBlock(VR, PS, ctx.baseTotal, ctx.discountTotal, ctx.finalTotal, ctx.segDetails || [], 'ru');
     ua = `Вітаємо, ${CLIENT_NAME}! ☀️
@@ -1093,7 +1110,6 @@ function calc() {
   const dayType      = getDayType();
   dayTypeBadgeEl.textContent = dayType.label;
   if (
-    !clientNameEl.value.trim() ||
     !gameDateEl.value ||
     !startEl.value ||
     !endEl.value
@@ -1103,7 +1119,7 @@ function calc() {
     discountValueEl.textContent = '0 грн';
     vrStatEl.textContent        = '0';
     psStatEl.textContent        = '0';
-    partsViewEl.textContent     = 'Заполните имя клиента, дату и время.';
+    partsViewEl.textContent     = 'Заполните дату и время.';
     msgRuEl.value = '';
     msgUaEl.value = '';
     return;
@@ -1139,8 +1155,10 @@ function calc() {
   let segDetails = [];
   let vrFinal = 0;
   let psFinal = 0;
+  let birthdaySchedule = null;
   if (msgType === 'birthday') {
-    const res = calcBirthday(start, end, vr, ps, dayType);
+    const addonBlocks = (typeof getAddonScheduleBlocks === 'function') ? getAddonScheduleBlocks() : [];
+    const res = calcBirthday(start, end, vr, ps, dayType, addonBlocks);
     baseTotal     = res.baseTotal;
     discountTotal = res.discountTotal;
     timeline      = res.timeline;
@@ -1149,6 +1167,7 @@ function calc() {
     segDetails    = res.segDetails || [];
     vrFinal       = res.vrFinal;
     psFinal       = res.psFinal;
+    birthdaySchedule = res.schedule;
   } else if (msgType === 'quest') {
     const res = calcQuest(start, end, totalPlaces, dayType);
     baseTotal     = res.baseTotal;
@@ -1220,7 +1239,8 @@ function calc() {
     start,
     end,
     totalGameHours,
-    segDetails
+    segDetails,
+    birthdaySchedule
   });
 }
 function copyExtra(id) {
@@ -1266,6 +1286,16 @@ document.getElementById('calcBtn').addEventListener('click', calc);
   adminNameEl,
   clientNameEl
 ].forEach(el => el.addEventListener('input', calc));
+// Аніматор/настільні ігри тепер впливають на тариф VR/PS (зсувають ігровий час),
+// тож зміна їх статусу чи часу має перерахувати ціну, а не тільки суму допів.
+['cb-animator', 'cb-games'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', calc);
+});
+['animator-time', 'animator-end-time', 'games-time', 'games-end-time'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', calc);
+});
 document.getElementById('themeBtn').addEventListener('click', () => {
   const root = document.documentElement;
   root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
@@ -1333,6 +1363,15 @@ function getDrinksLines(lang) {
   });
   return lines;
 }
+// Години з діапазону "час з" – "час до" (у форматі HH:MM). 0, якщо не заповнено
+// або "до" не пізніше "з".
+function rangeHours(startId, endId) {
+  const s = document.getElementById(startId).value;
+  const e = document.getElementById(endId).value;
+  if (!s || !e) return 0;
+  const diff = toMinutes(e) - toMinutes(s);
+  return diff > 0 ? diff / 60 : 0;
+}
 function getAddonPrice(cb) {
   const id = cb.id;
   if (!cb.checked) return 0;
@@ -1343,6 +1382,10 @@ function getAddonPrice(cb) {
   if (id === 'cb-cake')     return parseInt(document.getElementById('cake-price').value) || 0;
   if (id === 'cb-drinks')   return getDrinksTotal();
   if (id === 'cb-pomidoro') return parseInt(document.getElementById('pomidoro-price').value) || 0;
+  // Аніматор — ціна завжди вводиться вручну (програми відрізняються), час — лише для тайминга.
+  if (id === 'cb-animator') return parseInt(document.getElementById('animator-price').value) || 0;
+  // Настільні ігри — рахуємо автоматично: 1500 грн/год × тривалість з діапазону часу.
+  if (id === 'cb-games')    return 1500 * rangeHours('games-time', 'games-end-time');
   return parseInt(dp) || 0;
 }
 function calcAddonsTotal() {
@@ -1357,6 +1400,8 @@ function updateAddonTotals() {
   const inviteQty = parseInt(inviteQtyEl.value) || 1;
   document.getElementById('invite-total').textContent = fmt(inviteQty * 15) + ' грн';
   document.getElementById('drinks-total').textContent = fmt(getDrinksTotal()) + ' грн';
+  const gamesTotalEl = document.getElementById('games-total');
+  if (gamesTotalEl) gamesTotalEl.textContent = fmt(1500 * rangeHours('games-time', 'games-end-time')) + ' грн';
   const vr    = parseFloat((document.getElementById('t-vr').textContent || '0').replace(/[^\d.-]/g, '')) || 0;
   const ps    = parseFloat((document.getElementById('t-ps').textContent || '0').replace(/[^\d.-]/g, '')) || 0;
   const adv   = parseInt(advanceInputEl.value) || 0;
@@ -1383,6 +1428,8 @@ toggleAddonRow('cb-invite',   'row-invite');
 toggleAddonRow('cb-cake',     'row-cake');
 toggleAddonRow('cb-drinks',   'row-drinks');
 toggleAddonRow('cb-pomidoro', 'row-pomidoro');
+toggleAddonRow('cb-animator', 'row-animator');
+toggleAddonRow('cb-games',    'row-games');
 document.querySelectorAll('.addon-cb').forEach(cb => {
   cb.addEventListener('change', function () {
     this.closest('.addon-item').classList.toggle('checked', this.checked);
@@ -1406,6 +1453,11 @@ function collectAddonsState() {
     inviteQty: document.getElementById('invite-qty').value,
     cakePrice: document.getElementById('cake-price').value,
     pomidoroPrice: document.getElementById('pomidoro-price').value,
+    animatorTime: document.getElementById('animator-time').value,
+    animatorEndTime: document.getElementById('animator-end-time').value,
+    animatorPrice: document.getElementById('animator-price').value,
+    gamesTime: document.getElementById('games-time').value,
+    gamesEndTime: document.getElementById('games-end-time').value,
     advance: advanceInputEl.value,
     drinks
   };
@@ -1416,7 +1468,7 @@ function applyAddonsState(state) {
     cb.checked = !!(state.checked && state.checked[cb.id]);
     cb.closest('.addon-item').classList.toggle('checked', cb.checked);
   });
-  ['row-photoz','row-serv','row-invite','row-cake','row-drinks','row-pomidoro'].forEach(rowId => {
+  ['row-photoz','row-serv','row-invite','row-cake','row-drinks','row-pomidoro','row-animator','row-games'].forEach(rowId => {
     const cbId = 'cb-' + rowId.replace('row-', '');
     const cb = document.getElementById(cbId);
     const row = document.getElementById(rowId);
@@ -1427,6 +1479,11 @@ function applyAddonsState(state) {
   if (state.inviteQty !== undefined) document.getElementById('invite-qty').value = state.inviteQty || 1;
   if (state.cakePrice !== undefined) document.getElementById('cake-price').value = state.cakePrice;
   if (state.pomidoroPrice !== undefined) document.getElementById('pomidoro-price').value = state.pomidoroPrice;
+  if (state.animatorTime !== undefined) document.getElementById('animator-time').value = state.animatorTime;
+  if (state.animatorEndTime !== undefined) document.getElementById('animator-end-time').value = state.animatorEndTime;
+  if (state.animatorPrice !== undefined) document.getElementById('animator-price').value = state.animatorPrice;
+  if (state.gamesTime !== undefined) document.getElementById('games-time').value = state.gamesTime;
+  if (state.gamesEndTime !== undefined) document.getElementById('games-end-time').value = state.gamesEndTime;
   if (state.advance !== undefined) advanceInputEl.value = state.advance;
   document.querySelectorAll('.drink-qty').forEach(el => { el.value = 0; });
   (state.drinks || []).forEach(d => {
@@ -1434,6 +1491,120 @@ function applyAddonsState(state) {
     if (el) el.value = d.qty;
   });
   updateAddonTotals();
+}
+
+// --- Розклад свята (для тайминга у фіксуючому повідомленні) ---
+// Ті ж 30-хвилинні банкети й ігрові блоки, що й у buildBirthdayTimeline,
+// але як "сирі" сегменти в хвилинах — щоб можна було вставляти в них
+// блоки аніматора/настільних ігор і зсувати розклад.
+function buildBaseBirthdaySegments(startMin, endMin) {
+  const totalMinutes = endMin - startMin;
+  const BANQUET1_MIN = 30;
+  const BANQUET2_MIN = 30;
+  if (totalMinutes <= 60) {
+    return [{ start: startMin, end: endMin, labelRu: 'Игровое время', labelUa: 'Ігровий час', billable: true }];
+  }
+  const banquet1Start = startMin;
+  const banquet1End   = startMin + BANQUET1_MIN;
+  const playMinutesTotal = totalMinutes - BANQUET1_MIN - BANQUET2_MIN;
+  const eachPlay         = Math.round((playMinutesTotal / 2) / 15) * 15;
+  const game1Start = banquet1End;
+  const game1End   = game1Start + eachPlay;
+  const banquet2Start = game1End;
+  const banquet2End   = banquet2Start + BANQUET2_MIN;
+  const game2Start = banquet2End;
+  const game2End   = game2Start + eachPlay;
+  return [
+    { start: banquet1Start, end: banquet1End, labelRu: 'Сбор гостей и банкет', labelUa: 'Збір гостей та банкет', billable: false },
+    { start: game1Start,    end: game1End,    labelRu: 'Игровое время',        labelUa: 'Ігровий час',          billable: true },
+    { start: banquet2Start, end: banquet2End, labelRu: 'Торт и поздравления',  labelUa: 'Торт і привітання',    billable: false },
+    { start: game2Start,    end: game2End,    labelRu: 'Игры и сбор банкета',  labelUa: 'Ігри і збір банкета',  billable: true }
+  ];
+}
+// Вставляє блоки аніматора/настільних ігор у розклад і зсуває все, що йде
+// після них, на тривалість цих блоків (свято подовжується). Блоки допів
+// самі по собі ніколи не тарифікуються як ігровий VR/PS-час (billable:false) —
+// саме тому час гри, який вони "відсунули" пізніше, може потрапити під інший
+// тариф (до/після 18:00), і це має врахуватись у розрахунку.
+function insertAddonBlocksIntoSchedule(baseSegments, addonBlocks) {
+  const addons = addonBlocks.slice().sort((a, b) => a.start - b.start);
+  const output = [];
+  let shift = 0;
+  let addonIdx = 0;
+  baseSegments.forEach(seg => {
+    let cursor = seg.start;
+    while (addonIdx < addons.length && addons[addonIdx].start >= cursor && addons[addonIdx].start < seg.end) {
+      const addon = addons[addonIdx];
+      if (addon.start > cursor) {
+        output.push({ start: cursor + shift, end: addon.start + shift, labelRu: seg.labelRu, labelUa: seg.labelUa, billable: seg.billable });
+      }
+      output.push({ start: addon.start + shift, end: addon.start + shift + addon.duration, labelRu: addon.labelRu, labelUa: addon.labelUa, billable: false });
+      shift += addon.duration;
+      cursor = addon.start;
+      addonIdx++;
+    }
+    if (cursor < seg.end) {
+      output.push({ start: cursor + shift, end: seg.end + shift, labelRu: seg.labelRu, labelUa: seg.labelUa, billable: seg.billable });
+    }
+  });
+  while (addonIdx < addons.length) {
+    const addon = addons[addonIdx];
+    output.push({ start: addon.start + shift, end: addon.start + shift + addon.duration, labelRu: addon.labelRu, labelUa: addon.labelUa, billable: false });
+    shift += addon.duration;
+    addonIdx++;
+  }
+  return output;
+}
+// Збирає з форми (чекбокси + час "з"–"до") блоки аніматора/настільних ігор
+// для вставки в розклад свята. Спільна для розрахунку ціни (calc) і для
+// тайминга у фіксуючому повідомленні — щоб вони завжди збігались.
+function getAddonScheduleBlocks() {
+  const blocks = [];
+  const animatorCb = document.getElementById('cb-animator');
+  const animatorStartEl = document.getElementById('animator-time');
+  const animatorEndEl = document.getElementById('animator-end-time');
+  if (animatorCb && animatorCb.checked && animatorStartEl.value && animatorEndEl.value) {
+    const s = toMinutes(animatorStartEl.value);
+    const e = toMinutes(animatorEndEl.value);
+    if (e > s) blocks.push({ start: s, duration: e - s, labelRu: 'Аниматор', labelUa: 'Аніматор' });
+  }
+  const gamesCb = document.getElementById('cb-games');
+  const gamesStartEl = document.getElementById('games-time');
+  const gamesEndEl = document.getElementById('games-end-time');
+  if (gamesCb && gamesCb.checked && gamesStartEl.value && gamesEndEl.value) {
+    const s = toMinutes(gamesStartEl.value);
+    const e = toMinutes(gamesEndEl.value);
+    if (e > s) blocks.push({ start: s, duration: e - s, labelRu: 'Настольные игры', labelUa: 'Настільні ігри' });
+  }
+  return blocks;
+}
+function formatScheduleLines(segments, lang) {
+  return segments.map(seg => {
+    const label = lang === 'ua' ? seg.labelUa : seg.labelRu;
+    return `${fmtTime(seg.start)} – ${fmtTime(seg.end)} : ${label}`;
+  }).join('\n');
+}
+// Категорії допів для короткого списку "Також можемо додати" (тільки назви, без цін —
+// повний опис і ціни клієнт вже отримав окремим повідомленням).
+const ADDON_UPSELL_CATS = [
+  { labelUa: '🎨 Декор', labelRu: '🎨 Декор', ids: ['cb-decor1', 'cb-photoz', 'cb-serv', 'cb-invite'] },
+  { labelUa: '🎉 Розваги', labelRu: '🎉 Развлечения', ids: ['cb-animator', 'cb-games', 'cb-pinata', 'cb-candy', 'cb-bracelets'] },
+  { labelUa: '📸 Фото/відео', labelRu: '📸 Фото/видео', ids: ['cb-photographer', 'cb-videographer'] },
+  { labelUa: '🎂 Їжа та напої', labelRu: '🎂 Еда и напитки', ids: ['cb-cake', 'cb-drinks', 'cb-pomidoro'] }
+];
+function buildUpsellBlock(lang) {
+  const lines = [];
+  ADDON_UPSELL_CATS.forEach(cat => {
+    const unchecked = cat.ids
+      .map(id => document.getElementById(id))
+      .filter(cb => cb && !cb.checked);
+    if (!unchecked.length) return;
+    const names = unchecked.map(cb => (lang === 'ua' ? cb.dataset.nameUa : cb.dataset.nameRu)).join(', ');
+    lines.push(`${lang === 'ua' ? cat.labelUa : cat.labelRu}: ${names}`);
+  });
+  if (!lines.length) return '';
+  const header = lang === 'ua' ? 'Також можемо додати:' : 'Также можем добавить:';
+  return `${header}\n${lines.join('\n')}`;
 }
 
 // --- Формування фіксуючого повідомлення по допах ---
@@ -1478,6 +1649,16 @@ function buildAddonsMessage(lang) {
       const p = parseInt(document.getElementById('cake-price').value) || 0;
       return p > 0 ? `✅ ${n} — ${fmt(p)} грн` : (lang === 'ua' ? `✅ ${n} — від 1 800 грн/кг` : `✅ ${n} — от 1 800 грн/кг`);
     }
+    if (id === 'cb-animator' || id === 'cb-games') {
+      const startId = id === 'cb-animator' ? 'animator-time' : 'games-time';
+      const endId   = id === 'cb-animator' ? 'animator-end-time' : 'games-end-time';
+      const startVal = document.getElementById(startId).value;
+      const endVal   = document.getElementById(endId).value;
+      const timeStr = (startVal && endVal) ? `${startVal}–${endVal}` : '';
+      const price = getAddonPrice(cb);
+      const priceStr = price > 0 ? `${fmt(price)} грн` : (lang === 'ua' ? 'за домовленістю' : 'по договорённости');
+      return timeStr ? `✅ ${n} (${timeStr}) — ${priceStr}` : `✅ ${n} — ${priceStr}`;
+    }
     const price = getAddonPrice(cb);
     return price > 0 ? `✅ ${n} — ${fmt(price)} грн` : (lang === 'ua' ? `✅ ${n} — за домовленістю` : `✅ ${n} — по договорённости`);
   }
@@ -1488,6 +1669,21 @@ function buildAddonsMessage(lang) {
     const label = lang === 'ua' ? '🎁 *Ви вже обрали:*' : '🎁 *Вы уже выбрали:*';
     chosenBlock = `\n${label}\n\t${lines.join('\n\t')}`;
   }
+  // Тайминг свята з урахуванням аніматора/настільних ігор — та сама логіка,
+  // що й у розрахунку ціни (calc → calcBirthday), щоб тайминг і ціна завжди збігались.
+  let timingBlock = '';
+  if (startEl.value && endEl.value) {
+    const startMin = toMinutes(startEl.value);
+    const endMin = toMinutes(endEl.value);
+    if (endMin > startMin) {
+      const baseSegments = buildBaseBirthdaySegments(startMin, endMin);
+      const addonBlocks = getAddonScheduleBlocks();
+      const finalSchedule = addonBlocks.length ? insertAddonBlocksIntoSchedule(baseSegments, addonBlocks) : baseSegments;
+      const header = '⏱ *Тайминг:*';
+      timingBlock = `\n${header}\n${formatScheduleLines(finalSchedule, lang)}`;
+    }
+  }
+  const upsellBlock = buildUpsellBlock(lang);
   const vrL = lang === 'ua' ? 'VR-ігри' : 'VR-игры';
   const psL = lang === 'ua' ? 'PS-кімната' : 'PS-комната';
   const greeting = lang === 'ua'
@@ -1502,7 +1698,8 @@ function buildAddonsMessage(lang) {
   const footer = lang === 'ua'
     ? 'Якщо захочете щось додати — просто напишіть 😊'
     : 'Если захотите что-то добавить — просто напишите 😊';
-  return `${greeting}\n\n${priceLines}${chosenBlock}\n\n${totalsBlock}\n${footer}`;
+  const upsellPart = upsellBlock ? `\n\n${upsellBlock}` : '';
+  return `${greeting}\n${timingBlock}\n\n${priceLines}${chosenBlock}\n\n${totalsBlock}${upsellPart}\n${footer}`;
 }
 
 document.getElementById('genAddonMsgBtn').addEventListener('click', () => {
@@ -1564,10 +1761,17 @@ function renderHistory(history) {
     historyListEl.appendChild(div);
   });
 }
+let cloudLoadInProgress = false;
 async function cloudLoad() {
   const phone = normPhoneClient(clientPhoneEl.value);
   if (!phone) { cloudStatusEl.textContent = 'Введіть телефон клієнта у формі.'; return; }
   if (CLOUD_API_URL.includes('PUT_YOUR_WEB_APP_URL_HERE')) { cloudStatusEl.textContent = 'Хмару ще не підключено (немає URL Apps Script).'; return; }
+  // Скасовуємо будь-яке заплановане автозбереження і блокуємо нове,
+  // поки триває завантаження — інакше повільна відповідь сервера могла
+  // призвести до того, що автозбереження запишe поверх ще порожню форму
+  // і затре реальні збережені дані (саме це й було причиною "зникнення" допів).
+  clearTimeout(autoSaveTimer);
+  cloudLoadInProgress = true;
   cloudStatusEl.textContent = 'Завантаження…';
   try {
     const url = `${CLOUD_API_URL}?action=get&phone=${encodeURIComponent(clientPhoneEl.value)}&token=${encodeURIComponent(CLOUD_TOKEN)}`;
@@ -1575,7 +1779,7 @@ async function cloudLoad() {
     const json = await res.json();
     if (!json.ok) throw new Error(json.error || 'помилка сервера');
     if (!json.found) {
-      cloudStatusEl.textContent = 'Клієнта з таким телефоном ще немає — заповніть форму і натисніть «Зберегти».';
+      cloudStatusEl.textContent = 'Клієнта з таким телефоном ще немає — заповніть форму, і дані почнуть зберігатись автоматично.';
       renderHistory(json.history || []);
       return;
     }
@@ -1585,6 +1789,8 @@ async function cloudLoad() {
     calc();
   } catch (err) {
     cloudStatusEl.textContent = 'Помилка завантаження: ' + err.message;
+  } finally {
+    cloudLoadInProgress = false;
   }
 }
 async function cloudSave(auto) {
@@ -1689,9 +1895,13 @@ clientPhoneEl.addEventListener('input', () => {
 let autoSaveTimer = null;
 function scheduleAutoSave() {
   clearTimeout(autoSaveTimer);
+  if (cloudLoadInProgress) return; // не зберігаємо, поки триває завантаження з хмари
   const phone = normPhoneClient(clientPhoneEl.value);
   if (!isFullUaPhone(phone)) return;
-  autoSaveTimer = setTimeout(() => { cloudSave(true); }, 1500);
+  autoSaveTimer = setTimeout(() => {
+    if (cloudLoadInProgress) return; // перевірка ще раз на момент спрацювання
+    cloudSave(true);
+  }, 1500);
 }
 // Делегування подій на .wrap — покриває і поля, які створюються динамічно
 // пізніше (наприклад, список напоїв), а не тільки ті, що є в DOM зараз.
