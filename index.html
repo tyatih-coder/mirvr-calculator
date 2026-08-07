@@ -83,10 +83,8 @@
       <button class="theme" id="themeBtn">🌙 Тема</button>
     </div>
     <div class="cloud-bar">
-      <strong>☁️ Пошук за телефоном (поле «Телефон клиента» нижче):</strong>
-      <button class="btn secondary" id="cloudLoadBtn">Завантажити з хмари</button>
-      <button class="btn primary" id="cloudSaveBtn">Зберегти в хмару</button>
-      <span class="cloud-status" id="cloudStatus">Введіть телефон і ім'я клієнта — далі все зберігається автоматично. Кнопки потрібні лише щоб оновити вручну.</span>
+      <strong>☁️ Хмара:</strong>
+      <span class="cloud-status" id="cloudStatus">Код +380 вже підставлено — допишіть 9 цифр номера, і все підтягнеться та зберігатиметься автоматично, без кнопок. Ім'я клієнта не обов'язкове.</span>
     </div>
     <div class="hero">
       <section class="card">
@@ -99,7 +97,7 @@
             </div>
             <div>
               <label for="clientPhone">Телефон клиента</label>
-              <input id="clientPhone" type="tel" placeholder="+380XXXXXXXXX" />
+              <input id="clientPhone" type="tel" placeholder="+380XXXXXXXXX" value="+380" />
             </div>
             <div>
               <label for="adminName">Имя администратора</label>
@@ -1637,7 +1635,38 @@ async function cloudLogAddon(message) {
     console.error(err);
   }
 }
-document.getElementById('cloudLoadBtn').addEventListener('click', cloudLoad);
+// ---- Код країни +380 завжди в полі телефону ----
+function ensurePhonePrefix() {
+  let v = clientPhoneEl.value || '';
+  if (v.trim() === '') { clientPhoneEl.value = '+380'; return; }
+  if (v.startsWith('+380')) return;
+  const digits = v.replace(/\D/g, '');
+  if (digits.startsWith('380')) {
+    clientPhoneEl.value = '+' + digits;
+  } else {
+    // прибираємо можливий провідний нуль (0XXXXXXXXX) і додаємо код країни
+    clientPhoneEl.value = '+380' + digits.replace(/^0+/, '');
+  }
+}
+clientPhoneEl.addEventListener('focus', () => {
+  if (clientPhoneEl.value.trim() === '') {
+    clientPhoneEl.value = '+380';
+  }
+  // курсор в кінець, щоб адмін одразу дописував цифри після коду країни
+  const len = clientPhoneEl.value.length;
+  if (typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(() => clientPhoneEl.setSelectionRange(len, len));
+  } else {
+    clientPhoneEl.setSelectionRange(len, len);
+  }
+});
+clientPhoneEl.addEventListener('blur', ensurePhonePrefix);
+
+// Номер вважається "повним" (12 цифр разом з кодом країни 380 + 9 цифр),
+// щоб не смикати хмару після кожної введеної цифри.
+function isFullUaPhone(digits) {
+  return digits.length >= 12 || (digits.length === 10 && digits.startsWith('0'));
+}
 
 // Автопідтягування клієнта з хмари одразу як тільки введено номер телефону —
 // без натискання кнопки. Спрацьовує з невеликою затримкою після зупинки набору.
@@ -1646,7 +1675,7 @@ let lastAutoLoadedPhone = '';
 clientPhoneEl.addEventListener('input', () => {
   clearTimeout(autoLoadTimer);
   const phone = normPhoneClient(clientPhoneEl.value);
-  if (phone.length < 9) return; // ще не схоже на повний номер
+  if (!isFullUaPhone(phone)) return; // ще не схоже на повний номер
   autoLoadTimer = setTimeout(() => {
     if (phone === lastAutoLoadedPhone) return;
     lastAutoLoadedPhone = phone;
@@ -1656,13 +1685,12 @@ clientPhoneEl.addEventListener('input', () => {
 
 // Автозбереження — щоб адмін не забув натиснути «Зберегти» і нічого не загубилось.
 // Спрацьовує після паузи в редагуванні будь-якого поля бронювання чи допів,
-// якщо вже вказані і телефон, і ім'я клієнта.
+// якщо вже вказаний повний телефон (ім'я клієнта не обов'язкове).
 let autoSaveTimer = null;
 function scheduleAutoSave() {
   clearTimeout(autoSaveTimer);
   const phone = normPhoneClient(clientPhoneEl.value);
-  if (phone.length < 9) return;
-  if (!clientNameEl.value.trim()) return;
+  if (!isFullUaPhone(phone)) return;
   autoSaveTimer = setTimeout(() => { cloudSave(true); }, 1500);
 }
 // Делегування подій на .wrap — покриває і поля, які створюються динамічно
@@ -1679,7 +1707,8 @@ function scheduleAutoSave() {
 // Примітка: cloudLogAddon (фіксація допа) вже сама зберігає поточний стан
 // на сервері (Apps Script робить saveBooking всередині logAddon), тож
 // окремого автозбереження після фіксації допа не потрібно.
-document.getElementById('cloudSaveBtn').addEventListener('click', () => cloudSave(false));
+// Кнопок «Завантажити»/«Зберегти» більше немає — все відбувається автоматично
+// (cloudLoad викликається автопідтягуванням, cloudSave — автозбереженням).
 
 renderDrinksMenu();
 generateExtraOptsTexts();
