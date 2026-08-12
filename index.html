@@ -195,6 +195,16 @@
     <section class="card" id="bdayExtras" style="margin-top:24px;display:none">
       <div class="inner">
         <h3 style="margin:0 0 16px">📨 Додаткові повідомлення (тільки для ДР)</h3>
+        <!-- Сообщение 0: корисні посилання (відправляється одразу за основним) -->
+        <div class="box" style="margin-bottom:14px">
+          <h3>0. Корисні посилання (відразу після основного)</h3>
+          <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+            <button class="btn secondary" onclick="copyExtra('linksRu')">Скопировать RU</button>
+            <button class="btn secondary" onclick="copyExtra('linksUa')">Скопіювати UA</button>
+          </div>
+          <textarea id="linksRu" rows="10" readonly style="margin-bottom:8px"></textarea>
+          <textarea id="linksUa" rows="10" readonly></textarea>
+        </div>
         <!-- Сообщение 1: опции -->
         <div class="box" style="margin-bottom:14px">
           <h3>1. Додаткові опції для свята</h3>
@@ -403,6 +413,8 @@ const extraOptsRuEl = document.getElementById('extraOptsRu');
 const extraOptsUaEl = document.getElementById('extraOptsUa');
 const extraReqRuEl  = document.getElementById('extraReqRu');
 const extraReqUaEl  = document.getElementById('extraReqUa');
+const linksRuEl = document.getElementById('linksRu');
+const linksUaEl = document.getElementById('linksUa');
 const clientPhoneEl = document.getElementById('clientPhone');
 const addonsSection = document.getElementById('addonsSection');
 const cloudStatusEl = document.getElementById('cloudStatus');
@@ -636,15 +648,14 @@ function calcBirthday(start, end, vr, ps, dayType, addonBlocks) {
   const psFinal = Math.max(0, psBaseTotal - discountTotalPs);
   return { baseTotal, vrBaseTotal, psBaseTotal, vrFinal, psFinal, discountTotal, timeline, discountLine, totalGameHours, segDetails, schedule };
 }
-// Вартість оренди решти вільних VR-шоломів (щоб на святі не було інших відвідувачів).
+// Вартість VIP-пакету — увесь клуб (11 VR + 1 PS) на ігровий час свята.
 // Рахується по тих самих тарифних сегментах (rate/hours), що й основна гра — тому
-// коректно враховує розрив тарифу о 18:00, якщо ігровий час його перетинає. PS не враховується.
-function buildExclusivityInfo(segDetails, vrBooked) {
-  const extra = Math.max(0, TOTAL_VR_HELMETS - (vrBooked || 0));
-  if (extra <= 0 || !segDetails || !segDetails.length) return { extra, price: 0 };
+// коректно враховує розрив тарифу о 18:00, якщо ігровий час його перетинає.
+function buildVipPackagePrice(segDetails) {
+  if (!segDetails || !segDetails.length) return 0;
   let price = 0;
-  segDetails.forEach(seg => { price += seg.rate * seg.hours * extra; });
-  return { extra, price };
+  segDetails.forEach(seg => { price += seg.rate * seg.hours * (TOTAL_VR_HELMETS + 1); });
+  return price;
 }
 // Тайминг ДР для сообщений
 function buildBirthdayTimeline(startMin, endMin, lang) {
@@ -687,7 +698,7 @@ function buildBirthdayTimeline(startMin, endMin, lang) {
   }
 }
 // Блок расчёта для ДР (VR+PS) — компактный вывод для клиента
-function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, segDetails, lang) {
+function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, segDetails, lang, totalGameHours) {
   const lines = [];
   // Группируем сегменты по тарифу отдельно для VR и для PlayStation
   const vrGroups = {};
@@ -708,43 +719,45 @@ function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, se
   if (lang === 'ua') {
     lines.push(`💰 Розрахунок:`);
     if (vr > 0) {
-      lines.push(`VR (${vr} шолом.):`);
       vrRates.forEach(g => {
         const sum = g.rate * g.hours * vr;
         lines.push(`${g.rate} грн/год × ${vr} × ${hoursStr(g.hours)} год = ${moneyNum(sum)} грн`);
       });
     }
     if (ps > 0) {
-      lines.push(`PlayStation (${ps} шт.):`);
       psRates.forEach(g => {
         const sum = g.rate * g.hours * ps;
         lines.push(`${g.rate} грн/год × ${ps} × ${hoursStr(g.hours)} год = ${moneyNum(sum)} грн`);
       });
     }
-    lines.push(`Разом без знижок: ${moneyNum(baseTotal)} грн`);
-    if (discountTotal > 0) lines.push(`Знижка з 3-ї години (50%): −${moneyNum(discountTotal)} грн`);
-    lines.push(`До сплати: ${moneyNum(finalTotal)} грн`);
-    lines.push(`+50 грн/особа/год за квести (за бажанням на місці).`);
+    if (discountTotal > 0) {
+      lines.push('');
+      const label = (totalGameHours >= 3) ? 'Знижка з 3-ї години (50%)' : 'Знижка іменинникові (50%)';
+      lines.push(`${label}: −${moneyNum(discountTotal)} грн`);
+    }
+    lines.push('');
+    lines.push(`Разом: ${moneyNum(finalTotal)} грн`);
   } else {
     lines.push(`💰 Расчёт:`);
     if (vr > 0) {
-      lines.push(`VR (${vr} шлем.):`);
       vrRates.forEach(g => {
         const sum = g.rate * g.hours * vr;
         lines.push(`${g.rate} грн/ч × ${vr} × ${hoursStr(g.hours)} ч = ${moneyNum(sum)} грн`);
       });
     }
     if (ps > 0) {
-      lines.push(`PlayStation (${ps} шт.):`);
       psRates.forEach(g => {
         const sum = g.rate * g.hours * ps;
         lines.push(`${g.rate} грн/ч × ${ps} × ${hoursStr(g.hours)} ч = ${moneyNum(sum)} грн`);
       });
     }
-    lines.push(`Итого без скидок: ${moneyNum(baseTotal)} грн`);
-    if (discountTotal > 0) lines.push(`Скидка с 3-го часа (50%): −${moneyNum(discountTotal)} грн`);
-    lines.push(`К оплате: ${moneyNum(finalTotal)} грн`);
-    lines.push(`+50 грн/ч/чел за квесты (по желанию).`);
+    if (discountTotal > 0) {
+      lines.push('');
+      const label = (totalGameHours >= 3) ? 'Скидка с 3-го часа (50%)' : 'Скидка имениннику (50%)';
+      lines.push(`${label}: −${moneyNum(discountTotal)} грн`);
+    }
+    lines.push('');
+    lines.push(`Итого: ${moneyNum(finalTotal)} грн`);
   }
   return lines.join('\n');
 }
@@ -840,6 +853,35 @@ https://mirvrbirthday.wayforpay.shop/`;
 Дімітрова Яна В'ячеславівна (Моно)
 У призначенні платежу вкажіть: "Аванс за ДН + ім'я".`;
 }
+// Друге повідомлення для ДР — надсилається одразу за основним текстом.
+function generateUsefulLinksTexts() {
+  linksRuEl.value = `🔗 Полезные ссылки
+
+🍕 Меню Pomodoro
+https://delivery.pomodoro.od.ua/restaurants/4
+
+🥤 Напитки и коктейли MirVR
+https://mirvr.wayforpay.shop
+
+🎉 Что ещё можем организовать
+https://mirvrbirthday.wayforpay.shop/
+
+⭐ Отзывы о MirVR
+https://g.page/r/CS-kLQe9DbDjEBM`;
+  linksUaEl.value = `🔗 Корисні посилання
+
+🍕 Меню Pomodoro
+https://delivery.pomodoro.od.ua/restaurants/4
+
+🥤 Напої та коктейлі MirVR
+https://mirvr.wayforpay.shop
+
+🎉 Що ще можемо організувати
+https://mirvrbirthday.wayforpay.shop/
+
+⭐ Відгуки про MirVR
+https://g.page/r/CS-kLQe9DbDjEBM`;
+}
    function generateMessages(ctx) {
   const d         = formatDateUaRu(ctx.date);
   const DATE_RU   = d.ru;
@@ -857,14 +899,7 @@ https://mirvrbirthday.wayforpay.shop/`;
   const SIGN_UA   = hasAdmin ? `, адміністратор ${ADMIN}` : '';
   const CLIENT_NAME = ctx.client || 'гость';
   const DEPOSIT = Math.round(ctx.finalTotal * 0.5);
-  const EXCLUSIVITY_EXTRA = ctx.exclusivityExtra || 0;
-  const EXCLUSIVITY_PRICE = Math.round(ctx.exclusivityPrice || 0);
-  const EXCLUSIVITY_LINE_UA = EXCLUSIVITY_EXTRA > 0
-    ? `Якщо хочете, щоб окрім Вас у клубі нікого не було — потрібно орендувати всі ${TOTAL_VR_HELMETS} шоломів клубу. Доплата за це складе ${money(EXCLUSIVITY_PRICE)} (PlayStation в цю суму не входить).`
-    : (VR > 0 ? 'Ви вже бронюєте всі VR-шоломи клубу — інших відвідувачів у цей час не буде.' : '');
-  const EXCLUSIVITY_LINE_RU = EXCLUSIVITY_EXTRA > 0
-    ? `Если хотите, чтобы кроме Вас в клубе никого не было — нужно арендовать все ${TOTAL_VR_HELMETS} шлемов клуба. Доплата за это составит ${money(EXCLUSIVITY_PRICE)} (PlayStation в эту сумму не входит).`
-    : (VR > 0 ? 'Вы уже бронируете все VR-шлемы клуба — других посетителей в это время не будет.' : '');
+  const VIP_PRICE = Math.round(ctx.vipPrice || 0);
   const msgType = msgTypeEl.value;
   let ru = '';
   let ua = '';
@@ -966,149 +1001,121 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
 🌐 https://mirvr.com.ua`;
   } else if (msgType === 'birthday') {
     // Якщо є розклад з урахуванням аніматора/настільних ігор — показуємо саме його,
-    // інакше звичайний шаблон банкет-ігри-торт-ігри.
-    const TIMELINE_UA   = (ctx.birthdaySchedule && ctx.birthdaySchedule.length)
-      ? formatScheduleLines(ctx.birthdaySchedule, 'ua')
-      : buildBirthdayTimeline(ctx.start, ctx.end, 'ua');
-    const TIMELINE_RU   = (ctx.birthdaySchedule && ctx.birthdaySchedule.length)
-      ? formatScheduleLines(ctx.birthdaySchedule, 'ru')
-      : buildBirthdayTimeline(ctx.start, ctx.end, 'ru');
-    const CALC_UA       = buildBirthdayCalcBlock(VR, PS, ctx.baseTotal, ctx.discountTotal, ctx.finalTotal, ctx.segDetails || [], 'ua');
-    const CALC_RU       = buildBirthdayCalcBlock(VR, PS, ctx.baseTotal, ctx.discountTotal, ctx.finalTotal, ctx.segDetails || [], 'ru');
+    // інакше звичайний шаблон банкет-ігри-торт-ігри. Для клієнтського тексту використовуємо
+    // варіант з емодзі-мітками під кожен блок (банкет/гра/торт/аніматор тощо).
+    const scheduleForMsg = (ctx.birthdaySchedule && ctx.birthdaySchedule.length)
+      ? ctx.birthdaySchedule
+      : buildBaseBirthdaySegments(ctx.start, ctx.end);
+    const TIMELINE_UA   = formatScheduleLinesEmoji(scheduleForMsg, 'ua');
+    const TIMELINE_RU   = formatScheduleLinesEmoji(scheduleForMsg, 'ru');
+    const CALC_UA       = buildBirthdayCalcBlock(VR, PS, ctx.baseTotal, ctx.discountTotal, ctx.finalTotal, ctx.segDetails || [], 'ua', ctx.totalGameHours);
+    const CALC_RU       = buildBirthdayCalcBlock(VR, PS, ctx.baseTotal, ctx.discountTotal, ctx.finalTotal, ctx.segDetails || [], 'ru', ctx.totalGameHours);
+    const SIGN_LINE_UA = hasAdmin ? `З повагою,\nадміністратор ${ADMIN} 😊` : `З повагою,\nклуб віртуальної реальності MirVR 😊`;
+    const SIGN_LINE_RU = hasAdmin ? `С уважением,\nадминистратор ${ADMIN} 😊` : `С уважением,\nклуб виртуальной реальности MirVR 😊`;
     ua = `Вітаємо, ${CLIENT_NAME}! ☀️
-Клуб віртуальної реальності MirVR радий запропонувати Вам організацію 🥳 Дня народження 🥳
-Нижче наведені основні моменти проведення заходу. Якщо у Вас залишаться питання, з радістю обговоримо! 😊
 
-1️⃣ Зустріч гостей та банкет
-На збори та банкет зазвичай йде близько 30 хвилин, після чого діти з задоволенням переходять до ігор 🍕🎮.
+Будемо раді організувати для Вас незабутній День народження в клубі віртуальної реальності MirVR! 🥳🎮
+Нижче зібрали всю важливу інформацію та персональний розрахунок по Вашому святу 👇
 
-2️⃣ Ігровий час
-Стандартний ігровий час — 3 години. За цей час гості можуть пройти квести або пограти в командні та одиночні ігри. Але Ви можете забронювати як 2, так і 4 години ігор, на свій розсуд.
+1️⃣ Можливості клубу
 
-3️⃣ Урочиста частина
-Після ігор — 30 хвилин на торт 🎂, привітання іменинника, піньяту та настільні ігри. Цього часу достатньо, щоб ніхто не почав нудьгувати.
+🎮 11 VR-шоломів Oculus Quest 2 та Quest 3
+🎮 3 PlayStation-зони — PS4 Pro та PS5
+🤩 Більш ніж 100 ігор та 20+ VR-квестів
 
-4️⃣ Індивідуальність
-Якщо Ви хочете, щоб під час свята в клубі не було інших відвідувачів, потрібно забронювати всі ігрові консолі. В іншому випадку можуть бути інші гості клубу.
-${EXCLUSIVITY_LINE_UA}
+2️⃣ Стандартні ціни
 
-5️⃣ Замовлення їжі
-То що робимо ми:
-https://mirvr.wayforpay.shop
-Наші партнери:
-https://delivery.pomodoro.od.ua/restaurants/4
-Ви можете зробити замовлення самостійно за нашою адресою або надіслати нам скрін вибраних страв, і ми із задоволенням оформимо все за вас, щоб вам не довелося витрачати час на дзвінки з кур'єром 🥤🍴.
+• VR-ігри та PlayStation — 350 грн/особа/год
+• VR-квести — 400 грн/особа/год
 
-6️⃣ Ігрові місця
-У клубі є 11 бездротових VR-гарнітур Oculus Quest 2 та 3 😃
-✅ 4 місця в першій залі
-✅ 4 місця в другій залі
-✅ 3 місця в третій залі
-✅ 2 VIP-кімнати PlayStation 5
-✅ PlayStation 4 PRO + VR + Just Dance
-Ігри запускаються в порядку черги під керівництвом адміністратора 🧍
-У нас Ви знайдете більше 100 ігор та 20 унікальних квестів 🤩
+🔥 У будні до 18:00 — додаткова знижка 50 грн на будь-яке враження.
 
-7️⃣ Ціни
-✅ VR:
-- Будні дні з 11:00 до 18:00: 300 грн/год/особа
-- Після 18:00 та вихідні: 350 грн/год/особа
-✅ PlayStation (до 4 гравців):
-- Будні дні з 11:00 до 18:00: 300 грн/год
-- Після 18:00 та у вихідні: 350 грн/год
-✅ Квести +50 грн/особа/год.
-Настільні ігри та твістер — безкоштовно.
-${ctx.discountTotal > 0 && ctx.discountLine && ctx.discountLine.includes('1 игрока')
-  ? 'При попередньому бронюванні даруємо знижку 50% іменинникові, на честь свята.'
-  : 'При попередньому бронюванні даруємо знижку 50% на всі ігрові місця з третьої години, на честь свята.'}
+3️⃣ Персональний розрахунок та таймінг
 
-8️⃣ Форс-мажор
-Якщо кількість гостей змінюється, необхідно повідомити за 4 дні до заходу для перерахунку. Якщо гостей прийшло менше або стався форс-мажор, невикористана сума або аванс зараховуються на персональний рахунок в нашому клубі.
-Використати ці гроші може тільки одна особа протягом 6 місяців.
+📅 ${DATE_UA}
 
-9️⃣ Розрахунок та таймінг за Вашим запитом
-${DATE_UA}
 ${TIMELINE_UA}
-Будь ласка, приходьте не раніше узгодженого часу, оскільки до цього в клубі може проходити інший захід і клуб буде зайнятий
+
+Це рекомендований план свята — черговість можна змінювати за Вашим бажанням 😊
+
 ${CALC_UA}
 
-🔟 Аванс
-Для бронювання необхідно внести аванс — ${DEPOSIT} грн. Чим раніше, тим краще, оскільки місця можуть бути зайняті іншими клієнтами. Оплатити можна в клубі або за посиланням (відправимо окремо).
-❗️Аванс не повертається, але гарантує бронювання ігрових місць❗️
-Щоб закріпити дату — надішліть, будь ласка, аванс за реквізитами вище і повідомте нас: ми одразу підтвердимо бронювання ✅
+Будь ласка, приходьте до узгодженого часу — раніше в клубі може проходити інший захід.
 
-ВІДГУКИ: https://g.page/r/CS-kLQe9DbDjEBM
+4️⃣ VIP-формат — весь клуб для Вас
 
-З повагою клуб віртуальної реальності MirVR${SIGN_UA} 😊
+11 VR + 1 PS — і увесь клуб тільки для Вашої компанії 🎉
+При меншому бронюванні можливі інші гості.
+💰 Вартість VIP на обраний час — ${money(VIP_PRICE)}
+
+5️⃣ Зміна кількості ігрових місць
+
+Кількість ігрових місць можна змінити за 4 дні до заходу — ми скоригуємо розрахунок.
+
+Якщо у день свята знадобиться менше місць, оплата здійснюється у повному обсязі. Невідіграна сума зараховується на Ваш персональний рахунок, і цими грошима може скористатися одна особа протягом 6 місяців.
+
+6️⃣ Аванс
+
+Для фіксації дати та ігрових місць необхідно внести аванс — ${DEPOSIT} грн.
+
+❗️Аванс не повертається, але у разі форс-мажору зараховується на персональний рахунок у клубі.
+
+${SIGN_LINE_UA}
+
 -----------------------
 📞 093 942 34 70
 📍 Європейська, 89 (Катерининська)
 🌐 https://mirvr.com.ua/birthday`;
     ru = `Здравствуйте, ${CLIENT_NAME}! ☀️
-Клуб виртуальной реальности MirVR рад предложить Вам организацию 🥳 Дня рождения 🥳
-Ниже представлены основные моменты проведения мероприятия. Если у Вас останутся вопросы, с радостью обсудим! 😊
 
-1️⃣ Встреча гостей и банкет
-На сборы и банкет обычно уходит около 30 минут, после чего дети с удовольствием переходят к играм 🍕🎮.
+Будем рады организовать для вас незабываемый День рождения в клубе виртуальной реальности MirVR! 🥳🎮
+Ниже собрали всю важную информацию и персональный расчёт по вашему празднику 👇
 
-2️⃣ Игровое время
-Стандартное игровое время — 3 часа. За это время гости могут пройти квесты или поиграть в командные и одиночные игры. Но Вы можете забронировать как 2, так и 4 часа игр, на своё усмотрение.
+1️⃣ Возможности клуба
 
-3️⃣ Торжественная часть
-После игр — 30 минут на торт 🎂, поздравления именинника, пиньяту и настольные игры. Этого времени достаточно, чтобы никто не начал скучать.
+🎮 11 VR-шлемов Oculus Quest 2 и Quest 3
+🎮 3 PlayStation-зоны — PS4 Pro и PS5
+🤩 Более 100 игр и 20+ VR-квестов
 
-4️⃣ Индивидуальность
-Если вы хотите, чтобы во время праздника в клубе не было других посетителей, нужно забронировать все игровые консоли. В противном случае могут быть другие гости клуба.
-${EXCLUSIVITY_LINE_RU}
+2️⃣ Стандартные цены
 
-5️⃣ Заказ еды
-То, что делаем мы:
-https://mirvr.wayforpay.shop
-Наши партнёры:
-https://delivery.pomodoro.od.ua/restaurants/4
-Вы можете сделать заказ самостоятельно по нашему адресу или прислать нам скриншот выбранных блюд, и мы с удовольствием оформим всё за вас, чтобы вам не приходилось тратить время на звонки с курьером 🥤🍴.
+• VR-игры и PlayStation — 350 грн/чел/час
+• VR-квесты — 400 грн/чел/час
 
-6️⃣ Игровые места
-В клубе есть 11 беспроводных VR-гарнитур Oculus Quest 2 и 3 😃
-✅ 4 места в первом зале
-✅ 4 места во втором зале
-✅ 3 места в третьем зале
-✅ 2 VIP-комнаты PlayStation 5
-✅ PlayStation 4 PRO + VR + Just Dance
-Игры запускаются в порядке очереди под руководством администратора 🧍
-У нас Вы найдёте более 100 игр и 20 уникальных квестов 🤩
+🔥 В будни до 18:00 — дополнительная скидка 50 грн на любое впечатление.
 
-7️⃣ Цены
-✅ VR:
-- Будние дни с 11:00 до 18:00: 300 грн/ч/чел
-- После 18:00 и выходные: 350 грн/ч/чел
-✅ PlayStation (до 4 игроков):
-- Будние дни с 11:00 до 18:00: 300 грн/ч
-- После 18:00 и в выходные: 350 грн/ч
-✅ Квесты +50 грн/чел/ч.
-Настольные игры и твистер — бесплатно.
-${ctx.discountTotal > 0 && ctx.discountLine && ctx.discountLine.includes('1 игрока')
-  ? 'При предварительном бронировании дарим скидку 50% имениннику, в честь праздника.'
-  : 'При предварительном бронировании дарим скидку 50% на все игровые места с третьего часа, в честь праздника.'}
+3️⃣ Персональный расчёт и тайминг
 
-8️⃣ Форс-мажор
-Если количество гостей меняется, необходимо сообщить за 4 дня до мероприятия для перерасчёта. Если гостей пришло меньше или произошёл форс-мажор, неиспользованная сумма или аванс зачисляются на персональный счёт в нашем клубе.
-Воспользоваться этими деньгами может только одно лицо в течение 6 месяцев.
+📅 ${DATE_RU}
 
-9️⃣ Расчёт и тайминг по Вашему запросу
-${DATE_RU}
 ${TIMELINE_RU}
-Пожалуйста, приходите не раньше согласованного времени, так как до этого в клубе может проходить другое мероприятие и клуб будет занят
+
+Это рекомендованный план праздника — очередность можно менять по вашему желанию 😊
+
 ${CALC_RU}
 
-🔟 Аванс
-Для бронирования необходимо внести аванс — ${DEPOSIT} грн. Чем раньше, тем лучше, так как места могут быть заняты другими клиентами. Оплатить можно в клубе или по ссылке (отправим отдельно).
-❗️Аванс не возвращается, но гарантирует бронирование игровых мест❗️
-Чтобы закрепить дату — отправьте, пожалуйста, аванс по реквизитам выше и сообщите нам: мы сразу подтвердим бронирование ✅
+Пожалуйста, приходите к согласованному времени — ранее в клубе может проходить другое мероприятие.
 
-ОТЗЫВЫ: https://g.page/r/CS-kLQe9DbDjEBM
+4️⃣ VIP-формат — весь клуб для вас
 
-С уважением клуб виртуальной реальности MirVR${SIGN_RU} 😊
+11 VR + 1 PS — и весь клуб только для вашей компании 🎉
+При меньшем бронировании возможны другие гости.
+💰 Стоимость VIP на выбранное время — ${money(VIP_PRICE)}
+
+5️⃣ Изменение количества игровых мест
+
+Количество игровых мест можно изменить за 4 дня до мероприятия — мы скорректируем расчёт.
+
+Если в день праздника потребуется меньше мест, оплата производится в полном объёме. Неотыгранная сумма зачисляется на ваш персональный счёт, и этими деньгами может воспользоваться один человек в течение 6 месяцев.
+
+6️⃣ Аванс
+
+Для фиксации даты и игровых мест необходимо внести аванс — ${DEPOSIT} грн.
+
+❗️Аванс не возвращается, но в случае форс-мажора зачисляется на персональный счёт в клубе.
+
+${SIGN_LINE_RU}
+
 -----------------------
 📞 093 942 34 70
 📍 Европейская, 89 (Екатерининская)
@@ -1238,8 +1245,7 @@ function calc() {
   let vrFinal = 0;
   let psFinal = 0;
   let birthdaySchedule = null;
-  let exclusivityExtra = 0;
-  let exclusivityPrice = 0;
+  let vipPrice = 0;
   if (msgType === 'birthday') {
     const addonBlocks = (typeof getAddonScheduleBlocks === 'function') ? getAddonScheduleBlocks() : [];
     const res = calcBirthday(start, end, vr, ps, dayType, addonBlocks);
@@ -1252,9 +1258,7 @@ function calc() {
     vrFinal       = res.vrFinal;
     psFinal       = res.psFinal;
     birthdaySchedule = res.schedule;
-    const exclusivityInfo = buildExclusivityInfo(segDetails, vr);
-    exclusivityExtra = exclusivityInfo.extra;
-    exclusivityPrice = exclusivityInfo.price;
+    vipPrice = buildVipPackagePrice(segDetails);
   } else if (msgType === 'quest') {
     const res = calcQuest(start, end, totalPlaces, dayType);
     baseTotal     = res.baseTotal;
@@ -1328,8 +1332,7 @@ function calc() {
     totalGameHours,
     segDetails,
     birthdaySchedule,
-    exclusivityExtra,
-    exclusivityPrice
+    vipPrice
   });
 }
 function copyExtra(id) {
@@ -1666,6 +1669,22 @@ function getAddonScheduleBlocks() {
     if (e > s) blocks.push({ start: s, duration: e - s, labelRu: 'Настольные игры', labelUa: 'Настільні ігри' });
   }
   return blocks;
+}
+function emojiForScheduleLabel(label) {
+  const l = (label || '').toLowerCase();
+  // Порядок важливий: спершу вузькі, однозначні мітки (аніматор/ігри), потім
+  // "зустріч гостей" (за початком рядка, щоб не зачепити "...і збір банкета").
+  if (l.includes('аніматор') || l.includes('аниматор')) return '🎤';
+  if (l.includes('настільні') || l.includes('настольные')) return '🎲';
+  if (l.startsWith('торт')) return '🎂';
+  if (l.startsWith('збір') || l.startsWith('сбор') || l.startsWith('зустріч') || l.startsWith('встреча')) return '🍕';
+  return '🎮';
+}
+function formatScheduleLinesEmoji(segments, lang) {
+  return segments.map(seg => {
+    const label = lang === 'ua' ? seg.labelUa : seg.labelRu;
+    return `${emojiForScheduleLabel(label)} ${fmtTime(seg.start)}–${fmtTime(seg.end)} — ${label}`;
+  }).join('\n');
 }
 function formatScheduleLines(segments, lang) {
   return segments.map(seg => {
@@ -2011,6 +2030,7 @@ function scheduleAutoSave() {
 
 renderDrinksMenu();
 generateExtraOptsTexts();
+generateUsefulLinksTexts();
 calc();
 updateAddonTotals();
 </script>
