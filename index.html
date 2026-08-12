@@ -717,7 +717,8 @@ function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, se
   const psRates = Object.values(psGroups).sort((a, b) => a.rate - b.rate);
   const hoursStr = h => (Number.isInteger(h) ? String(h) : h.toFixed(1).replace('.', ','));
   if (lang === 'ua') {
-    lines.push(`💰 Розрахунок:`);
+    lines.push(`💰 Розрахунок на ${vr} гравців:`);
+    lines.push('');
     if (vr > 0) {
       vrRates.forEach(g => {
         const sum = g.rate * g.hours * vr;
@@ -738,7 +739,8 @@ function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, se
     lines.push('');
     lines.push(`Разом: ${moneyNum(finalTotal)} грн`);
   } else {
-    lines.push(`💰 Расчёт:`);
+    lines.push(`💰 Расчёт на ${vr} игроков:`);
+    lines.push('');
     if (vr > 0) {
       vrRates.forEach(g => {
         const sum = g.rate * g.hours * vr;
@@ -1017,7 +1019,7 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
 Будемо раді організувати для Вас незабутній День народження в клубі віртуальної реальності MirVR! 🥳🎮
 Нижче зібрали всю важливу інформацію та персональний розрахунок по Вашому святу 👇
 
-1️⃣ Можливості клубу
+1️⃣ У нашому клубі є
 
 🎮 11 VR-шоломів Oculus Quest 2 та Quest 3
 🎮 3 PlayStation-зони — PS4 Pro та PS5
@@ -1071,7 +1073,7 @@ ${SIGN_LINE_UA}
 Будем рады организовать для вас незабываемый День рождения в клубе виртуальной реальности MirVR! 🥳🎮
 Ниже собрали всю важную информацию и персональный расчёт по вашему празднику 👇
 
-1️⃣ Возможности клуба
+1️⃣ В нашем клубе есть
 
 🎮 11 VR-шлемов Oculus Quest 2 и Quest 3
 🎮 3 PlayStation-зоны — PS4 Pro и PS5
