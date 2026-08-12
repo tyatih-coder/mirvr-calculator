@@ -697,8 +697,25 @@ function buildBirthdayTimeline(startMin, endMin, lang) {
     ].join('\n');
   }
 }
+// Відмінювання "час"/"година" для короткого підсумкового рядка з кількістю
+// ігрових годин. Для нецілих значень (наприклад, 2.5) використовуємо
+// скорочення "ч."/"год.", щоб не помилитись з відмінком.
+function ruHoursWord(n) {
+  if (!Number.isInteger(n)) return 'ч.';
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'час';
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return 'часа';
+  return 'часов';
+}
+function uaHoursWord(n) {
+  if (!Number.isInteger(n)) return 'год.';
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'годину';
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return 'години';
+  return 'годин';
+}
 // Блок расчёта для ДР (VR+PS) — компактный вывод для клиента
-function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, segDetails, lang, totalGameHours) {
+function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, vrFinal, psFinal, segDetails, lang, totalGameHours) {
   const lines = [];
   // Группируем сегменты по тарифу отдельно для VR и для PlayStation
   const vrGroups = {};
@@ -718,19 +735,24 @@ function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, se
   const hoursStr = h => (Number.isInteger(h) ? String(h) : h.toFixed(1).replace('.', ','));
   // Об'єднуємо тарифні ставки VR і PS в один список періодів — щоб рядки йшли
   // згруповані за тарифним періодом (а не окремо всі VR, потім усі PS).
-  // Підпис "Тариф до/після 18:00" з'являється, лише якщо бронь реально
-  // перетинає межу (тобто періодів більше одного).
+  // Підпис "До/Після 18:00" з'являється, лише якщо бронь реально перетинає
+  // межу (тобто періодів більше одного).
   const allRates = Array.from(new Set([...vrRates.map(g => g.rate), ...psRates.map(g => g.rate)])).sort((a, b) => a - b);
   const showPeriodLabel = allRates.length > 1;
+  // "Одночасно можуть грати" — VR це 1 особа на шолом, PS-кімната вміщує від
+  // 1 до 4 гравців одночасно (тариф за кімнату, а не за людину).
+  const minPlayers = vr + ps;
+  const maxPlayers = vr + ps * 4;
   if (lang === 'ua') {
     const headerParts = [];
     if (vr > 0) headerParts.push(`${vr} VR`);
     if (ps > 0) headerParts.push(`${ps} PS`);
-    lines.push(`💰 Розрахунок на ${headerParts.join(' + ')}:`);
+    lines.push(`💰 Розрахунок на ${headerParts.join(' + ')}`);
+    if (ps > 0) lines.push(`Одночасно можуть грати ${minPlayers}–${maxPlayers} осіб.`);
     lines.push('');
     allRates.forEach((rate, idx) => {
       if (showPeriodLabel) {
-        lines.push(idx === 0 ? 'Тариф до 18:00' : 'Тариф після 18:00');
+        lines.push(idx === 0 ? 'До 18:00:' : 'Після 18:00:');
       }
       const vrG = vrRates.find(g => g.rate === rate);
       if (vrG) lines.push(`${vr} VR × ${hoursStr(vrG.hours)} год = ${moneyNum(rate * vrG.hours * vr)} грн`);
@@ -738,21 +760,23 @@ function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, se
       if (psG) lines.push(`${ps} PS × ${hoursStr(psG.hours)} год = ${moneyNum(rate * psG.hours * ps)} грн`);
     });
     if (discountTotal > 0) {
-      lines.push('');
-      const label = (totalGameHours >= 3) ? 'Знижка з 3-ї години (50%)' : 'Знижка іменинникові (50%)';
-      lines.push(`${label}: −${moneyNum(discountTotal)} грн`);
+      const label = (totalGameHours >= 3) ? 'Знижка з 3-ї години' : 'Знижка іменинникові';
+      lines.push(`🔥 ${label} — 50%: −${moneyNum(discountTotal)} грн`);
     }
-    lines.push('');
-    lines.push(`Разом: ${moneyNum(finalTotal)} грн`);
+    lines.push(`Разом за ${hoursStr(totalGameHours)} ${uaHoursWord(totalGameHours)} гри:`);
+    if (vr > 0) lines.push(`🎮 ${vr} VR — ${moneyNum(vrFinal)} грн`);
+    if (ps > 0) lines.push(`🎮 ${ps} PS — ${moneyNum(psFinal)} грн`);
+    lines.push(`💰 Разом: ${moneyNum(finalTotal)} грн`);
   } else {
     const headerParts = [];
     if (vr > 0) headerParts.push(`${vr} VR`);
     if (ps > 0) headerParts.push(`${ps} PS`);
-    lines.push(`💰 Расчёт на ${headerParts.join(' + ')}:`);
+    lines.push(`💰 Расчёт на ${headerParts.join(' + ')}`);
+    if (ps > 0) lines.push(`Одновременно могут играть ${minPlayers}–${maxPlayers} человек.`);
     lines.push('');
     allRates.forEach((rate, idx) => {
       if (showPeriodLabel) {
-        lines.push(idx === 0 ? 'Тариф до 18:00' : 'Тариф после 18:00');
+        lines.push(idx === 0 ? 'До 18:00:' : 'После 18:00:');
       }
       const vrG = vrRates.find(g => g.rate === rate);
       if (vrG) lines.push(`${vr} VR × ${hoursStr(vrG.hours)} ч = ${moneyNum(rate * vrG.hours * vr)} грн`);
@@ -760,12 +784,13 @@ function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, se
       if (psG) lines.push(`${ps} PS × ${hoursStr(psG.hours)} ч = ${moneyNum(rate * psG.hours * ps)} грн`);
     });
     if (discountTotal > 0) {
-      lines.push('');
-      const label = (totalGameHours >= 3) ? 'Скидка с 3-го часа (50%)' : 'Скидка имениннику (50%)';
-      lines.push(`${label}: −${moneyNum(discountTotal)} грн`);
+      const label = (totalGameHours >= 3) ? 'Скидка с 3-го часа' : 'Скидка имениннику';
+      lines.push(`🔥 ${label} — 50%: −${moneyNum(discountTotal)} грн`);
     }
-    lines.push('');
-    lines.push(`Итого: ${moneyNum(finalTotal)} грн`);
+    lines.push(`Итого за ${hoursStr(totalGameHours)} ${ruHoursWord(totalGameHours)} игр:`);
+    if (vr > 0) lines.push(`🎮 ${vr} VR — ${moneyNum(vrFinal)} грн`);
+    if (ps > 0) lines.push(`🎮 ${ps} PS — ${moneyNum(psFinal)} грн`);
+    lines.push(`💰 Итого: ${moneyNum(finalTotal)} грн`);
   }
   return lines.join('\n');
 }
@@ -1020,8 +1045,8 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
       : buildBaseBirthdaySegments(ctx.start, ctx.end);
     const TIMELINE_UA   = formatScheduleLinesEmoji(scheduleForMsg, 'ua');
     const TIMELINE_RU   = formatScheduleLinesEmoji(scheduleForMsg, 'ru');
-    const CALC_UA       = buildBirthdayCalcBlock(VR, PS, ctx.baseTotal, ctx.discountTotal, ctx.finalTotal, ctx.segDetails || [], 'ua', ctx.totalGameHours);
-    const CALC_RU       = buildBirthdayCalcBlock(VR, PS, ctx.baseTotal, ctx.discountTotal, ctx.finalTotal, ctx.segDetails || [], 'ru', ctx.totalGameHours);
+    const CALC_UA       = buildBirthdayCalcBlock(VR, PS, ctx.baseTotal, ctx.discountTotal, ctx.finalTotal, ctx.vrFinal, ctx.psFinal, ctx.segDetails || [], 'ua', ctx.totalGameHours);
+    const CALC_RU       = buildBirthdayCalcBlock(VR, PS, ctx.baseTotal, ctx.discountTotal, ctx.finalTotal, ctx.vrFinal, ctx.psFinal, ctx.segDetails || [], 'ru', ctx.totalGameHours);
     const SIGN_LINE_UA = hasAdmin ? `З повагою,\nадміністратор ${ADMIN} 😊` : `З повагою,\nклуб віртуальної реальності MirVR 😊`;
     const SIGN_LINE_RU = hasAdmin ? `С уважением,\nадминистратор ${ADMIN} 😊` : `С уважением,\nклуб виртуальной реальности MirVR 😊`;
     ua = `Вітаємо, ${CLIENT_NAME}! ☀️
@@ -1346,7 +1371,9 @@ function calc() {
     totalGameHours,
     segDetails,
     birthdaySchedule,
-    vipPrice
+    vipPrice,
+    vrFinal,
+    psFinal
   });
 }
 function copyExtra(id) {
