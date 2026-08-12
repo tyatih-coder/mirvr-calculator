@@ -717,18 +717,21 @@ function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, se
   const psRates = Object.values(psGroups).sort((a, b) => a.rate - b.rate);
   const hoursStr = h => (Number.isInteger(h) ? String(h) : h.toFixed(1).replace('.', ','));
   if (lang === 'ua') {
-    lines.push(`💰 Розрахунок на ${vr} гравців:`);
+    const headerParts = [];
+    if (vr > 0) headerParts.push(`${vr} VR`);
+    if (ps > 0) headerParts.push(`${ps} PS`);
+    lines.push(`💰 Розрахунок на ${headerParts.join(' + ')}:`);
     lines.push('');
     if (vr > 0) {
       vrRates.forEach(g => {
         const sum = g.rate * g.hours * vr;
-        lines.push(`${g.rate} грн/год × ${vr} × ${hoursStr(g.hours)} год = ${moneyNum(sum)} грн`);
+        lines.push(`${vr} VR × ${hoursStr(g.hours)} год = ${moneyNum(sum)} грн`);
       });
     }
     if (ps > 0) {
       psRates.forEach(g => {
         const sum = g.rate * g.hours * ps;
-        lines.push(`${g.rate} грн/год × ${ps} × ${hoursStr(g.hours)} год = ${moneyNum(sum)} грн`);
+        lines.push(`${ps} PS × ${hoursStr(g.hours)} год = ${moneyNum(sum)} грн`);
       });
     }
     if (discountTotal > 0) {
@@ -739,18 +742,21 @@ function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, se
     lines.push('');
     lines.push(`Разом: ${moneyNum(finalTotal)} грн`);
   } else {
-    lines.push(`💰 Расчёт на ${vr} игроков:`);
+    const headerParts = [];
+    if (vr > 0) headerParts.push(`${vr} VR`);
+    if (ps > 0) headerParts.push(`${ps} PS`);
+    lines.push(`💰 Расчёт на ${headerParts.join(' + ')}:`);
     lines.push('');
     if (vr > 0) {
       vrRates.forEach(g => {
         const sum = g.rate * g.hours * vr;
-        lines.push(`${g.rate} грн/ч × ${vr} × ${hoursStr(g.hours)} ч = ${moneyNum(sum)} грн`);
+        lines.push(`${vr} VR × ${hoursStr(g.hours)} ч = ${moneyNum(sum)} грн`);
       });
     }
     if (ps > 0) {
       psRates.forEach(g => {
         const sum = g.rate * g.hours * ps;
-        lines.push(`${g.rate} грн/ч × ${ps} × ${hoursStr(g.hours)} ч = ${moneyNum(sum)} грн`);
+        lines.push(`${ps} PS × ${hoursStr(g.hours)} ч = ${moneyNum(sum)} грн`);
       });
     }
     if (discountTotal > 0) {
