@@ -1312,6 +1312,18 @@ function calc() {
   ];
   const detail = detailLines.join('\n');
   partsViewEl.textContent = detail;
+  // Без імені та телефону клієнта текст для відправки не формуємо — щоб
+  // адміністратор не забув їх заповнити перед відправкою.
+  const clientNameFilled  = !!clientNameEl.value.trim();
+  const clientPhoneDigits = String(clientPhoneEl.value || '').replace(/\D/g, '');
+  const clientPhoneFilled = isFullUaPhone(clientPhoneDigits);
+  if (!clientNameFilled || !clientPhoneFilled) {
+    msgRuEl.value = 'Заполните, пожалуйста, имя и номер телефона клиента — без этого текст для отправки не формируется.';
+    msgUaEl.value = 'Заповніть, будь ласка, ім\'я та номер телефону клієнта — без цього текст для відправки не формується.';
+    bdayExtrasSection.style.display = 'none';
+    if (addonsSection) addonsSection.style.display = 'none';
+    return;
+  }
   generateMessages({
     date: gameDateEl.value,
     timeFrom: startEl.value,
@@ -1361,13 +1373,32 @@ function copyPre(id) {
 function openFile(path) {
   window.open(path, '_blank');
 }
+// Відкриває листування саме з цим клієнтом за номером телефону (а не просто
+// вікно "поділитись текстом без адресата"). Прив'язки за номером і Viber,
+// і Telegram НЕ підтримують одночасну підстановку тексту — тому текст
+// лишається доступним окремо через кнопки "Скопіювати" вище, а тут просто
+// відкриваємо потрібний чат.
+// Приводить будь-який введений варіант номера (з кодом країни, з провідним
+// нулем або без нього) до формату 380XXXXXXXXX — незалежно від того, чи
+// встиг спрацювати ensurePhonePrefix() на blur.
+function normalizeUaPhoneDigits(raw) {
+  let digits = String(raw || '').replace(/\D/g, '');
+  if (digits.startsWith('380')) return digits;
+  if (digits.startsWith('0')) return '380' + digits.replace(/^0+/, '');
+  return digits.length ? '380' + digits : '';
+}
+function getClientPhoneDigits() {
+  return normalizeUaPhoneDigits(clientPhoneEl.value);
+}
 document.getElementById('viberBtn').addEventListener('click', () => {
-  const text = encodeURIComponent(`${msgRuEl.value}\n\n---\n\n${msgUaEl.value}`);
-  window.open(`viber://forward?text=${text}`, '_blank');
+  const digits = getClientPhoneDigits();
+  if (!digits) { alert('Спочатку вкажіть номер телефону клієнта.'); return; }
+  window.open(`viber://chat?number=%2B${digits}`, '_blank');
 });
 document.getElementById('telegramBtn').addEventListener('click', () => {
-  const text = encodeURIComponent(`${msgRuEl.value}\n\n---\n\n${msgUaEl.value}`);
-  window.open(`https://t.me/share/url?url=&text=${text}`, '_blank');
+  const digits = getClientPhoneDigits();
+  if (!digits) { alert('Спочатку вкажіть номер телефону клієнта.'); return; }
+  window.open(`https://t.me/+${digits}`, '_blank');
 });
 document.getElementById('calcBtn').addEventListener('click', calc);
 [
@@ -1378,7 +1409,8 @@ document.getElementById('calcBtn').addEventListener('click', calc);
   psPlacesEl,
   msgTypeEl,
   adminNameEl,
-  clientNameEl
+  clientNameEl,
+  clientPhoneEl
 ].forEach(el => el.addEventListener('input', calc));
 // Аніматор/настільні ігри тепер впливають на тариф VR/PS (зсувають ігровий час),
 // тож зміна їх статусу чи часу має перерахувати ціну, а не тільки суму допів.
