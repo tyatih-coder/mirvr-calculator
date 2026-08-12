@@ -144,7 +144,7 @@
             <div class="stat"><span>VR шлемы</span><strong id="vrStat">0</strong></div>
             <div class="stat" id="psStatBox"><span>PlayStation</span><strong id="psStat">0</strong></div>
           </div>
-          <div class="box" style="margin-bottom:14px">
+          <div class="box" style="margin-bottom:14px;display:none">
             <div class="box-head">
               <h3>Разбивка</h3>
               <button class="btn secondary" onclick="copyPre('partsView')">Скопировать расчёт</button>
@@ -205,16 +205,16 @@
           <textarea id="linksRu" rows="10" readonly style="margin-bottom:8px"></textarea>
           <textarea id="linksUa" rows="10" readonly></textarea>
         </div>
-        <!-- Сообщение 1: опции -->
-        <div class="box" style="margin-bottom:14px">
-          <h3>1. Додаткові опції для свята</h3>
-          <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <!-- Сообщение 1: опции (згорнуто за замовчуванням — потрібно рідко, зазвичай замінене посиланнями) -->
+        <details class="box" style="margin-bottom:14px">
+          <summary style="cursor:pointer;font-weight:700">1. Додаткові опції для свята (натисніть, щоб розгорнути)</summary>
+          <div style="display:flex;gap:10px;margin:10px 0;flex-wrap:wrap">
             <button class="btn secondary" onclick="copyExtra('extraOptsRu')">Скопировать RU</button>
             <button class="btn secondary" onclick="copyExtra('extraOptsUa')">Скопіювати UA</button>
           </div>
           <textarea id="extraOptsRu" rows="16" readonly style="margin-bottom:8px"></textarea>
           <textarea id="extraOptsUa" rows="16" readonly></textarea>
-        </div>
+        </details>
         <!-- Сообщение 2: реквизиты -->
         <div class="box" style="margin-bottom:14px">
           <h3>2. Реквізити для оплати</h3>
