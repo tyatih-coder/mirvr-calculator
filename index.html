@@ -716,24 +716,27 @@ function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, se
   const vrRates = Object.values(vrGroups).sort((a, b) => a.rate - b.rate);
   const psRates = Object.values(psGroups).sort((a, b) => a.rate - b.rate);
   const hoursStr = h => (Number.isInteger(h) ? String(h) : h.toFixed(1).replace('.', ','));
+  // Об'єднуємо тарифні ставки VR і PS в один список періодів — щоб рядки йшли
+  // згруповані за тарифним періодом (а не окремо всі VR, потім усі PS).
+  // Підпис "Тариф до/після 18:00" з'являється, лише якщо бронь реально
+  // перетинає межу (тобто періодів більше одного).
+  const allRates = Array.from(new Set([...vrRates.map(g => g.rate), ...psRates.map(g => g.rate)])).sort((a, b) => a - b);
+  const showPeriodLabel = allRates.length > 1;
   if (lang === 'ua') {
     const headerParts = [];
     if (vr > 0) headerParts.push(`${vr} VR`);
     if (ps > 0) headerParts.push(`${ps} PS`);
     lines.push(`💰 Розрахунок на ${headerParts.join(' + ')}:`);
     lines.push('');
-    if (vr > 0) {
-      vrRates.forEach(g => {
-        const sum = g.rate * g.hours * vr;
-        lines.push(`${vr} VR × ${hoursStr(g.hours)} год = ${moneyNum(sum)} грн`);
-      });
-    }
-    if (ps > 0) {
-      psRates.forEach(g => {
-        const sum = g.rate * g.hours * ps;
-        lines.push(`${ps} PS × ${hoursStr(g.hours)} год = ${moneyNum(sum)} грн`);
-      });
-    }
+    allRates.forEach((rate, idx) => {
+      if (showPeriodLabel) {
+        lines.push(idx === 0 ? 'Тариф до 18:00' : 'Тариф після 18:00');
+      }
+      const vrG = vrRates.find(g => g.rate === rate);
+      if (vrG) lines.push(`${vr} VR × ${hoursStr(vrG.hours)} год = ${moneyNum(rate * vrG.hours * vr)} грн`);
+      const psG = psRates.find(g => g.rate === rate);
+      if (psG) lines.push(`${ps} PS × ${hoursStr(psG.hours)} год = ${moneyNum(rate * psG.hours * ps)} грн`);
+    });
     if (discountTotal > 0) {
       lines.push('');
       const label = (totalGameHours >= 3) ? 'Знижка з 3-ї години (50%)' : 'Знижка іменинникові (50%)';
@@ -747,18 +750,15 @@ function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, se
     if (ps > 0) headerParts.push(`${ps} PS`);
     lines.push(`💰 Расчёт на ${headerParts.join(' + ')}:`);
     lines.push('');
-    if (vr > 0) {
-      vrRates.forEach(g => {
-        const sum = g.rate * g.hours * vr;
-        lines.push(`${vr} VR × ${hoursStr(g.hours)} ч = ${moneyNum(sum)} грн`);
-      });
-    }
-    if (ps > 0) {
-      psRates.forEach(g => {
-        const sum = g.rate * g.hours * ps;
-        lines.push(`${ps} PS × ${hoursStr(g.hours)} ч = ${moneyNum(sum)} грн`);
-      });
-    }
+    allRates.forEach((rate, idx) => {
+      if (showPeriodLabel) {
+        lines.push(idx === 0 ? 'Тариф до 18:00' : 'Тариф после 18:00');
+      }
+      const vrG = vrRates.find(g => g.rate === rate);
+      if (vrG) lines.push(`${vr} VR × ${hoursStr(vrG.hours)} ч = ${moneyNum(rate * vrG.hours * vr)} грн`);
+      const psG = psRates.find(g => g.rate === rate);
+      if (psG) lines.push(`${ps} PS × ${hoursStr(psG.hours)} ч = ${moneyNum(rate * psG.hours * ps)} грн`);
+    });
     if (discountTotal > 0) {
       lines.push('');
       const label = (totalGameHours >= 3) ? 'Скидка с 3-го часа (50%)' : 'Скидка имениннику (50%)';
