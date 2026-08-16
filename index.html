@@ -765,10 +765,12 @@ function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, vr
       lines.push(`🔥 ${label} — 50%: −${moneyNum(discountTotal)} грн`);
       lines.push('');
     }
-    lines.push(`Вартість з урахуванням знижки:`);
-    if (vr > 0) lines.push(`🎮 ${vr} VR — ${moneyNum(vrFinal)} грн`);
-    if (ps > 0) lines.push(`🎮 ${ps} PS — ${moneyNum(psFinal)} грн`);
-    lines.push('');
+    if (ps > 0) {
+      lines.push(`Вартість з урахуванням знижки:`);
+      if (vr > 0) lines.push(`🥽 ${vr} VR — ${moneyNum(vrFinal)} грн`);
+      lines.push(`🎮 ${ps} PS — ${moneyNum(psFinal)} грн`);
+      lines.push('');
+    }
     lines.push(`💰 Разом: *${moneyNum(finalTotal)} грн*`);
   } else {
     const headerParts = [];
@@ -792,10 +794,12 @@ function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, vr
       lines.push(`🔥 ${label} — 50%: −${moneyNum(discountTotal)} грн`);
       lines.push('');
     }
-    lines.push(`Стоимость с учетом скидки:`);
-    if (vr > 0) lines.push(`🎮 ${vr} VR — ${moneyNum(vrFinal)} грн`);
-    if (ps > 0) lines.push(`🎮 ${ps} PS — ${moneyNum(psFinal)} грн`);
-    lines.push('');
+    if (ps > 0) {
+      lines.push(`Стоимость с учетом скидки:`);
+      if (vr > 0) lines.push(`🥽 ${vr} VR — ${moneyNum(vrFinal)} грн`);
+      lines.push(`🎮 ${ps} PS — ${moneyNum(psFinal)} грн`);
+      lines.push('');
+    }
     lines.push(`💰 Итого: *${moneyNum(finalTotal)} грн*`);
   }
   return lines.join('\n');
