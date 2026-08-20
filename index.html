@@ -558,26 +558,19 @@ function calcBirthday(start, end, vr, ps, dayType, addonBlocks) {
   let psBaseTotal = 0;
   let discountTotal = 0;
   let discountLine = '';
-  // Розклад свята з урахуванням аніматора/настільних ігор (якщо вказано час):
-  // їхні блоки вставляються в потрібне місце і зсувають усе, що йде після,
-  // тож ігровий (тарифікований) час може реально потрапити на інший тариф.
   const baseSegments = buildBaseBirthdaySegments(start, end);
   const schedule = insertAddonBlocksIntoSchedule(baseSegments, addonBlocks);
-  // Ігрові сегменти для тарифікації VR/PS — лише ті, що позначені billable
   const gameSegments = schedule
     .filter(seg => seg.billable)
     .map(seg => ({ start: seg.start, end: seg.end, label: seg.labelRu }));
-  // Суммарное игровое время (часы) — не меняется от сдвига, меняется только его положение на часах
   let totalGameMinutes = 0;
   gameSegments.forEach(seg => { totalGameMinutes += (seg.end - seg.start); });
   const totalGameHours = totalGameMinutes / 60;
-  // Расчёт стоимости по сегментам — дробим по границе 18:00 если пересекает
   const segDetails = [];
   const placesLabel = [];
   if (vr > 0) placesLabel.push(`${vr} VR`);
   if (ps > 0) placesLabel.push(`${ps} PS`);
   gameSegments.forEach(seg => {
-    // Разбиваем по границе SWITCH_MINUTES (18:00) если сегмент её пересекает
     const subSegs = [];
     if (dayType.isWeekday && seg.start < SWITCH_MINUTES && seg.end > SWITCH_MINUTES) {
       subSegs.push({ start: seg.start, end: SWITCH_MINUTES, label: seg.label });
@@ -609,7 +602,6 @@ function calcBirthday(start, end, vr, ps, dayType, addonBlocks) {
       }
     });
   });
-  // Скидка с 3-го часа (50%) — используем segDetails (уже разбиты по 18:00)
   if (totalGameHours >= 3) {
     let accumulatedHours = 0;
     let discountBaseVr = 0;
@@ -617,7 +609,6 @@ function calcBirthday(start, end, vr, ps, dayType, addonBlocks) {
     segDetails.forEach(seg => {
       const segHours = seg.hours;
       const segStart = accumulatedHours;
-      // Часть этого сегмента после 2-го часа (зона скидки)
       const discountStartInSeg = Math.max(0, 2 - segStart);
       const discountHours = Math.max(0, segHours - discountStartInSeg);
       if (discountHours > 0) {
@@ -634,7 +625,6 @@ function calcBirthday(start, end, vr, ps, dayType, addonBlocks) {
     if (discountTotalPs > 0) discountParts.push(`PlayStation ${money(discountTotalPs)}`);
     discountLine = `Скидка с 3-го часа (50%): ${discountParts.join(', ')} (всего ${money(discountTotal)})`;
   } else {
-    // Меньше 3 часов — скидка 50% для 1 игрока (именинник), считаем от VR, если он есть, иначе от PS
     let onePlayerTotal = 0;
     segDetails.forEach(seg => {
       onePlayerTotal += seg.rate * seg.hours;
@@ -648,16 +638,12 @@ function calcBirthday(start, end, vr, ps, dayType, addonBlocks) {
   const psFinal = Math.max(0, psBaseTotal - discountTotalPs);
   return { baseTotal, vrBaseTotal, psBaseTotal, vrFinal, psFinal, discountTotal, timeline, discountLine, totalGameHours, segDetails, schedule };
 }
-// Вартість VIP-пакету — увесь клуб (11 VR + 1 PS) на ігровий час свята.
-// Рахується по тих самих тарифних сегментах (rate/hours), що й основна гра — тому
-// коректно враховує розрив тарифу о 18:00, якщо ігровий час його перетинає.
 function buildVipPackagePrice(segDetails) {
   if (!segDetails || !segDetails.length) return 0;
   let price = 0;
   segDetails.forEach(seg => { price += seg.rate * seg.hours * (TOTAL_VR_HELMETS + 1); });
   return price;
 }
-// Тайминг ДР для сообщений
 function buildBirthdayTimeline(startMin, endMin, lang) {
   const totalMinutes = endMin - startMin;
   const BANQUET1_MIN = 30;
@@ -697,9 +683,6 @@ function buildBirthdayTimeline(startMin, endMin, lang) {
     ].join('\n');
   }
 }
-// Відмінювання "час"/"година" для короткого підсумкового рядка з кількістю
-// ігрових годин. Для нецілих значень (наприклад, 2.5) використовуємо
-// скорочення "ч."/"год.", щоб не помилитись з відмінком.
 function ruHoursWord(n) {
   if (!Number.isInteger(n)) return 'ч.';
   const mod10 = n % 10, mod100 = n % 100;
@@ -717,7 +700,6 @@ function uaHoursWord(n) {
 // Блок расчёта для ДР (VR+PS) — компактный вывод для клиента
 function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, vrFinal, psFinal, segDetails, lang, totalGameHours) {
   const lines = [];
-  // Группируем сегменты по тарифу отдельно для VR и для PlayStation
   const vrGroups = {};
   const psGroups = {};
   segDetails.forEach(seg => {
@@ -733,14 +715,8 @@ function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, vr
   const vrRates = Object.values(vrGroups).sort((a, b) => a.rate - b.rate);
   const psRates = Object.values(psGroups).sort((a, b) => a.rate - b.rate);
   const hoursStr = h => (Number.isInteger(h) ? String(h) : h.toFixed(1).replace('.', ','));
-  // Об'єднуємо тарифні ставки VR і PS в один список періодів — щоб рядки йшли
-  // згруповані за тарифним періодом (а не окремо всі VR, потім усі PS).
-  // Підпис "До/Після 18:00" з'являється, лише якщо бронь реально перетинає
-  // межу (тобто періодів більше одного).
   const allRates = Array.from(new Set([...vrRates.map(g => g.rate), ...psRates.map(g => g.rate)])).sort((a, b) => a - b);
   const showPeriodLabel = allRates.length > 1;
-  // "Одночасно можуть грати" — VR це 1 особа на шолом, PS-кімната вміщує від
-  // 1 до 4 гравців одночасно (тариф за кімнату, а не за людину).
   const minPlayers = vr + ps;
   const maxPlayers = vr + ps * 4;
   if (lang === 'ua') {
@@ -772,6 +748,7 @@ function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, vr
       lines.push('');
     }
     lines.push(`💰 Разом: *${moneyNum(finalTotal)} грн*`);
+    lines.push(`+50 грн/год/особа доплата за квест, якщо ви оберете його на місці.`);
   } else {
     const headerParts = [];
     if (vr > 0) headerParts.push(`${vr} VR`);
@@ -801,6 +778,7 @@ function buildBirthdayCalcBlock(vr, ps, baseTotal, discountTotal, finalTotal, vr
       lines.push('');
     }
     lines.push(`💰 Итого: *${moneyNum(finalTotal)} грн*`);
+    lines.push(`+50 грн/час/чел доплата за квест, если вы выберете его на месте.`);
   }
   return lines.join('\n');
 }
@@ -898,7 +876,6 @@ https://mirvrbirthday.wayforpay.shop/`;
 У призначенні платежу вкажіть: "Аванс за ДН + ім'я".
 Після оплати, будь ласка, надішліть підтвердження (скриншот або чек) ✅`;
 }
-// Друге повідомлення для ДР — надсилається одразу за основним текстом.
 function generateUsefulLinksTexts() {
   linksRuEl.value = `🔗 Полезные ссылки
 
@@ -1047,9 +1024,6 @@ https://pay.mbnk.biz/H3TxgYnnS2nX
 📍 Європейська, 89 (Катерининська)
 🌐 https://mirvr.com.ua`;
   } else if (msgType === 'birthday') {
-    // Якщо є розклад з урахуванням аніматора/настільних ігор — показуємо саме його,
-    // інакше звичайний шаблон банкет-ігри-торт-ігри. Для клієнтського тексту використовуємо
-    // варіант з емодзі-мітками під кожен блок (банкет/гра/торт/аніматор тощо).
     const scheduleForMsg = (ctx.birthdaySchedule && ctx.birthdaySchedule.length)
       ? ctx.birthdaySchedule
       : buildBaseBirthdaySegments(ctx.start, ctx.end);
@@ -1314,7 +1288,6 @@ function calc() {
     psFinal       = res.psBaseTotal;
   }
   const finalTotal = Math.max(0, baseTotal - discountTotal);
-  // Синхронізуємо з блоком допів (VR/PS) для ДР
   const t_vrEl = document.getElementById('t-vr');
   const t_psEl = document.getElementById('t-ps');
   if (t_vrEl) t_vrEl.textContent = money(vrFinal);
@@ -1347,8 +1320,6 @@ function calc() {
   ];
   const detail = detailLines.join('\n');
   partsViewEl.textContent = detail;
-  // Без імені та телефону клієнта текст для відправки не формуємо — щоб
-  // адміністратор не забув їх заповнити перед відправкою.
   const clientNameFilled  = !!clientNameEl.value.trim();
   const clientPhoneDigits = String(clientPhoneEl.value || '').replace(/\D/g, '');
   const clientPhoneFilled = isFullUaPhone(clientPhoneDigits);
@@ -1410,14 +1381,6 @@ function copyPre(id) {
 function openFile(path) {
   window.open(path, '_blank');
 }
-// Відкриває листування саме з цим клієнтом за номером телефону (а не просто
-// вікно "поділитись текстом без адресата"). Прив'язки за номером і Viber,
-// і Telegram НЕ підтримують одночасну підстановку тексту — тому текст
-// лишається доступним окремо через кнопки "Скопіювати" вище, а тут просто
-// відкриваємо потрібний чат.
-// Приводить будь-який введений варіант номера (з кодом країни, з провідним
-// нулем або без нього) до формату 380XXXXXXXXX — незалежно від того, чи
-// встиг спрацювати ensurePhonePrefix() на blur.
 function normalizeUaPhoneDigits(raw) {
   let digits = String(raw || '').replace(/\D/g, '');
   if (digits.startsWith('380')) return digits;
@@ -1449,8 +1412,6 @@ document.getElementById('calcBtn').addEventListener('click', calc);
   clientNameEl,
   clientPhoneEl
 ].forEach(el => el.addEventListener('input', calc));
-// Аніматор/настільні ігри тепер впливають на тариф VR/PS (зсувають ігровий час),
-// тож зміна їх статусу чи часу має перерахувати ціну, а не тільки суму допів.
 ['cb-animator', 'cb-games'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener('change', calc);
@@ -1526,8 +1487,6 @@ function getDrinksLines(lang) {
   });
   return lines;
 }
-// Години з діапазону "час з" – "час до" (у форматі HH:MM). 0, якщо не заповнено
-// або "до" не пізніше "з".
 function rangeHours(startId, endId) {
   const s = document.getElementById(startId).value;
   const e = document.getElementById(endId).value;
@@ -1545,9 +1504,7 @@ function getAddonPrice(cb) {
   if (id === 'cb-cake')     return parseInt(document.getElementById('cake-price').value) || 0;
   if (id === 'cb-drinks')   return getDrinksTotal();
   if (id === 'cb-pomidoro') return parseInt(document.getElementById('pomidoro-price').value) || 0;
-  // Аніматор — ціна завжди вводиться вручну (програми відрізняються), час — лише для тайминга.
   if (id === 'cb-animator') return parseInt(document.getElementById('animator-price').value) || 0;
-  // Настільні ігри — рахуємо автоматично: 1500 грн/год × тривалість з діапазону часу.
   if (id === 'cb-games')    return 1500 * rangeHours('games-time', 'games-end-time');
   return parseInt(dp) || 0;
 }
@@ -1557,7 +1514,7 @@ function calcAddonsTotal() {
 function updateAddonTotals() {
   const servQtyEl = document.getElementById('serv-qty');
   const inviteQtyEl = document.getElementById('invite-qty');
-  if (!servQtyEl) return; // addons markup not present
+  if (!servQtyEl) return;
   const servQty = parseInt(servQtyEl.value) || 1;
   document.getElementById('serv-total').textContent = fmt(servQty * 90) + ' грн';
   const inviteQty = parseInt(inviteQtyEl.value) || 1;
@@ -1656,10 +1613,6 @@ function applyAddonsState(state) {
   updateAddonTotals();
 }
 
-// --- Розклад свята (для тайминга у фіксуючому повідомленні) ---
-// Ті ж 30-хвилинні банкети й ігрові блоки, що й у buildBirthdayTimeline,
-// але як "сирі" сегменти в хвилинах — щоб можна було вставляти в них
-// блоки аніматора/настільних ігор і зсувати розклад.
 function buildBaseBirthdaySegments(startMin, endMin) {
   const totalMinutes = endMin - startMin;
   const BANQUET1_MIN = 30;
@@ -1684,11 +1637,6 @@ function buildBaseBirthdaySegments(startMin, endMin) {
     { start: game2Start,    end: game2End,    labelRu: 'Игры и сбор банкета',  labelUa: 'Ігри і збір банкета',  billable: true }
   ];
 }
-// Вставляє блоки аніматора/настільних ігор у розклад і зсуває все, що йде
-// після них, на тривалість цих блоків (свято подовжується). Блоки допів
-// самі по собі ніколи не тарифікуються як ігровий VR/PS-час (billable:false) —
-// саме тому час гри, який вони "відсунули" пізніше, може потрапити під інший
-// тариф (до/після 18:00), і це має врахуватись у розрахунку.
 function insertAddonBlocksIntoSchedule(baseSegments, addonBlocks) {
   const addons = addonBlocks.slice().sort((a, b) => a.start - b.start);
   const output = [];
@@ -1718,9 +1666,6 @@ function insertAddonBlocksIntoSchedule(baseSegments, addonBlocks) {
   }
   return output;
 }
-// Збирає з форми (чекбокси + час "з"–"до") блоки аніматора/настільних ігор
-// для вставки в розклад свята. Спільна для розрахунку ціни (calc) і для
-// тайминга у фіксуючому повідомленні — щоб вони завжди збігались.
 function getAddonScheduleBlocks() {
   const blocks = [];
   const animatorCb = document.getElementById('cb-animator');
@@ -1743,8 +1688,6 @@ function getAddonScheduleBlocks() {
 }
 function emojiForScheduleLabel(label) {
   const l = (label || '').toLowerCase();
-  // Порядок важливий: спершу вузькі, однозначні мітки (аніматор/ігри), потім
-  // "зустріч гостей" (за початком рядка, щоб не зачепити "...і збір банкета").
   if (l.includes('аніматор') || l.includes('аниматор')) return '🎤';
   if (l.includes('настільні') || l.includes('настольные')) return '🎲';
   if (l.startsWith('торт')) return '🎂';
@@ -1763,8 +1706,6 @@ function formatScheduleLines(segments, lang) {
     return `${fmtTime(seg.start)} – ${fmtTime(seg.end)} : ${label}`;
   }).join('\n');
 }
-// Категорії допів для короткого списку "Також можемо додати" (тільки назви, без цін —
-// повний опис і ціни клієнт вже отримав окремим повідомленням).
 const ADDON_UPSELL_CATS = [
   { labelUa: '🎨 Декор', labelRu: '🎨 Декор', ids: ['cb-decor1', 'cb-photoz', 'cb-serv', 'cb-invite'] },
   { labelUa: '🎉 Розваги', labelRu: '🎉 Развлечения', ids: ['cb-animator', 'cb-games', 'cb-pinata', 'cb-candy', 'cb-bracelets'] },
@@ -1848,8 +1789,6 @@ function buildAddonsMessage(lang) {
     const label = lang === 'ua' ? '🎁 *Ви вже обрали:*' : '🎁 *Вы уже выбрали:*';
     chosenBlock = `\n${label}\n${lines.join('\n')}`;
   }
-  // Тайминг свята з урахуванням аніматора/настільних ігор — та сама логіка,
-  // що й у розрахунку ціни (calc → calcBirthday), щоб тайминг і ціна завжди збігались.
   let timingBlock = '';
   if (startEl.value && endEl.value) {
     const startMin = toMinutes(startEl.value);
@@ -1874,11 +1813,14 @@ function buildAddonsMessage(lang) {
   const advLabel   = lang === 'ua' ? '*Аванс сплачено:*' : '*Аванс оплачен:*';
   const payLabel   = lang === 'ua' ? '*До оплати в клубі:*' : '*К оплате в клубе:*';
   const totalsBlock = `${totalLabel} ${fmt(total)} грн\n${advLabel} ${fmt(adv)} грн\n${payLabel} ${fmt(pay)} грн`;
+  const questNote = lang === 'ua'
+    ? '+50 грн/год/особа доплата за квест, якщо ви оберете його на місці.'
+    : '+50 грн/час/чел доплата за квест, если вы выберете его на месте.';
   const footer = lang === 'ua'
     ? 'Якщо захочете щось додати — просто напишіть 😊'
     : 'Если захотите что-то добавить — просто напишите 😊';
   const upsellPart = upsellBlock ? `\n\n${upsellBlock}` : '';
-  return `${greeting}\n${timingBlock}\n\n${priceLines}${chosenBlock}\n\n${totalsBlock}${upsellPart}\n${footer}`;
+  return `${greeting}\n${timingBlock}\n\n${priceLines}${chosenBlock}\n\n${totalsBlock}\n${questNote}${upsellPart}\n${footer}`;
 }
 
 document.getElementById('genAddonMsgBtn').addEventListener('click', () => {
@@ -1886,7 +1828,6 @@ document.getElementById('genAddonMsgBtn').addEventListener('click', () => {
   const ru = buildAddonsMessage('ru');
   document.getElementById('addonMsgUa').value = ua;
   document.getElementById('addonMsgRu').value = ru;
-  // Зафіксувати зміну в хмарі (лог + оновлення поточного стану)
   cloudLogAddon(`UA:\n${ua}\n\nRU:\n${ru}`);
 });
 
@@ -1945,10 +1886,6 @@ async function cloudLoad() {
   const phone = normPhoneClient(clientPhoneEl.value);
   if (!phone) { cloudStatusEl.textContent = 'Введіть телефон клієнта у формі.'; return; }
   if (CLOUD_API_URL.includes('PUT_YOUR_WEB_APP_URL_HERE')) { cloudStatusEl.textContent = 'Хмару ще не підключено (немає URL Apps Script).'; return; }
-  // Скасовуємо будь-яке заплановане автозбереження і блокуємо нове,
-  // поки триває завантаження — інакше повільна відповідь сервера могла
-  // призвести до того, що автозбереження запишe поверх ще порожню форму
-  // і затре реальні збережені дані (саме це й було причиною "зникнення" допів).
   clearTimeout(autoSaveTimer);
   cloudLoadInProgress = true;
   cloudStatusEl.textContent = 'Завантаження…';
@@ -1999,7 +1936,7 @@ async function cloudSave(auto) {
 }
 async function cloudLogAddon(message) {
   const phone = normPhoneClient(clientPhoneEl.value);
-  if (!phone) return; // без телефону не логуємо
+  if (!phone) return;
   if (CLOUD_API_URL.includes('PUT_YOUR_WEB_APP_URL_HERE')) return;
   try {
     const res = await fetch(CLOUD_API_URL, {
@@ -2020,7 +1957,6 @@ async function cloudLogAddon(message) {
     console.error(err);
   }
 }
-// ---- Код країни +380 завжди в полі телефону ----
 function ensurePhonePrefix() {
   let v = clientPhoneEl.value || '';
   if (v.trim() === '') { clientPhoneEl.value = '+380'; return; }
@@ -2029,7 +1965,6 @@ function ensurePhonePrefix() {
   if (digits.startsWith('380')) {
     clientPhoneEl.value = '+' + digits;
   } else {
-    // прибираємо можливий провідний нуль (0XXXXXXXXX) і додаємо код країни
     clientPhoneEl.value = '+380' + digits.replace(/^0+/, '');
   }
 }
@@ -2037,7 +1972,6 @@ clientPhoneEl.addEventListener('focus', () => {
   if (clientPhoneEl.value.trim() === '') {
     clientPhoneEl.value = '+380';
   }
-  // курсор в кінець, щоб адмін одразу дописував цифри після коду країни
   const len = clientPhoneEl.value.length;
   if (typeof window.requestAnimationFrame === 'function') {
     window.requestAnimationFrame(() => clientPhoneEl.setSelectionRange(len, len));
@@ -2047,20 +1981,16 @@ clientPhoneEl.addEventListener('focus', () => {
 });
 clientPhoneEl.addEventListener('blur', ensurePhonePrefix);
 
-// Номер вважається "повним" (12 цифр разом з кодом країни 380 + 9 цифр),
-// щоб не смикати хмару після кожної введеної цифри.
 function isFullUaPhone(digits) {
   return digits.length >= 12 || (digits.length === 10 && digits.startsWith('0'));
 }
 
-// Автопідтягування клієнта з хмари одразу як тільки введено номер телефону —
-// без натискання кнопки. Спрацьовує з невеликою затримкою після зупинки набору.
 let autoLoadTimer = null;
 let lastAutoLoadedPhone = '';
 clientPhoneEl.addEventListener('input', () => {
   clearTimeout(autoLoadTimer);
   const phone = normPhoneClient(clientPhoneEl.value);
-  if (!isFullUaPhone(phone)) return; // ще не схоже на повний номер
+  if (!isFullUaPhone(phone)) return;
   autoLoadTimer = setTimeout(() => {
     if (phone === lastAutoLoadedPhone) return;
     lastAutoLoadedPhone = phone;
@@ -2068,22 +1998,17 @@ clientPhoneEl.addEventListener('input', () => {
   }, 600);
 });
 
-// Автозбереження — щоб адмін не забув натиснути «Зберегти» і нічого не загубилось.
-// Спрацьовує після паузи в редагуванні будь-якого поля бронювання чи допів,
-// якщо вже вказаний повний телефон (ім'я клієнта не обов'язкове).
 let autoSaveTimer = null;
 function scheduleAutoSave() {
   clearTimeout(autoSaveTimer);
-  if (cloudLoadInProgress) return; // не зберігаємо, поки триває завантаження з хмари
+  if (cloudLoadInProgress) return;
   const phone = normPhoneClient(clientPhoneEl.value);
   if (!isFullUaPhone(phone)) return;
   autoSaveTimer = setTimeout(() => {
-    if (cloudLoadInProgress) return; // перевірка ще раз на момент спрацювання
+    if (cloudLoadInProgress) return;
     cloudSave(true);
   }, 1500);
 }
-// Делегування подій на .wrap — покриває і поля, які створюються динамічно
-// пізніше (наприклад, список напоїв), а не тільки ті, що є в DOM зараз.
 (() => {
   const wrapEl = document.querySelector('.wrap');
   wrapEl.addEventListener('input', e => {
@@ -2093,11 +2018,6 @@ function scheduleAutoSave() {
     if (e.target.matches('input, select')) scheduleAutoSave();
   });
 })();
-// Примітка: cloudLogAddon (фіксація допа) вже сама зберігає поточний стан
-// на сервері (Apps Script робить saveBooking всередині logAddon), тож
-// окремого автозбереження після фіксації допа не потрібно.
-// Кнопок «Завантажити»/«Зберегти» більше немає — все відбувається автоматично
-// (cloudLoad викликається автопідтягуванням, cloudSave — автозбереженням).
 
 renderDrinksMenu();
 generateExtraOptsTexts();
